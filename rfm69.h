@@ -25,6 +25,9 @@
 #include "rfm69registers.h"
 #include "spi.h"
 
+#define RESET_PIN GPIO_Pin_5
+#define RESET_PORT GPIOA
+
 
 #define RF69_315MHZ            31 // non trivial values to avoid misconfiguration
 #define RF69_433MHZ            43

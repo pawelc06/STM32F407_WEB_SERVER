@@ -164,6 +164,7 @@ GPIO_InitTypeDefStruct.GPIO_OType = GPIO_OType_PP;
 GPIO_InitTypeDefStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
 GPIO_Init(GPIOB, &GPIO_InitTypeDefStruct);
 
+/** NSS/CS SPI pin */
 GPIO_InitTypeDefStruct.GPIO_Pin = GPIO_Pin_0;
 GPIO_InitTypeDefStruct.GPIO_Mode = GPIO_Mode_OUT;
 GPIO_InitTypeDefStruct.GPIO_Speed = GPIO_Speed_50MHz;
@@ -171,12 +172,7 @@ GPIO_InitTypeDefStruct.GPIO_PuPd = GPIO_PuPd_UP;
 GPIO_InitTypeDefStruct.GPIO_OType = GPIO_OType_PP;
 GPIO_Init(GPIOC, &GPIO_InitTypeDefStruct);
 
-GPIO_InitTypeDefStruct.GPIO_Pin = GPIO_Pin_5;
-GPIO_InitTypeDefStruct.GPIO_Mode = GPIO_Mode_OUT;
-GPIO_InitTypeDefStruct.GPIO_Speed = GPIO_Speed_50MHz;
-GPIO_InitTypeDefStruct.GPIO_PuPd = GPIO_PuPd_UP;
-GPIO_InitTypeDefStruct.GPIO_OType = GPIO_OType_PP;
-GPIO_Init(GPIOB, &GPIO_InitTypeDefStruct);
+
 
 GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_SPI2);
 GPIO_PinAFConfig(GPIOC, GPIO_PinSource2, GPIO_AF_SPI2);

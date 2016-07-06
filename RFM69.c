@@ -41,7 +41,31 @@ GPIO_TypeDef* _csGPIO;
  * @return The value of the register
  */
 
+void RFM69_GPIO_Init(){
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB , ENABLE);
 
+	GPIO_InitTypeDef GPIO_InitTypeDefStruct;
+
+	/* Interrupt debug pin */
+	GPIO_InitTypeDefStruct.GPIO_Pin = GPIO_Pin_5;
+	GPIO_InitTypeDefStruct.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitTypeDefStruct.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitTypeDefStruct.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_InitTypeDefStruct.GPIO_OType = GPIO_OType_PP;
+	GPIO_Init(GPIOA, &GPIO_InitTypeDefStruct);
+
+	/* RESET Pin */
+	GPIO_InitTypeDefStruct.GPIO_Pin = RESET_PIN;
+	GPIO_InitTypeDefStruct.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitTypeDefStruct.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_InitTypeDefStruct.GPIO_PuPd = GPIO_PuPd_DOWN;
+	GPIO_InitTypeDefStruct.GPIO_OType = GPIO_OType_PP;
+	GPIO_Init(RESET_PORT, &GPIO_InitTypeDefStruct);
+
+	GPIO_ResetBits(RESET_PORT, RESET_PIN);
+
+
+}
 
 uint8_t readRegister(uint8_t reg)
 {
@@ -141,8 +165,8 @@ void RFM69_init(uint8_t freqBand,uint8_t networkID){
 	 //_spi = SPI2;
 	  _csGPIO = GPIOC;
 	  _csPin = GPIO_Pin_0;
-	  _resetGPIO = 0;
-	  _resetPin = 0;
+	  _resetGPIO = RESET_PORT;
+	  _resetPin = RESET_PIN;
 	  _init2 = 0;
 	  _mode = RFM69_MODE_STANDBY;
 	  _highPowerDevice = false;
@@ -156,6 +180,17 @@ void RFM69_init(uint8_t freqBand,uint8_t networkID){
 	  _highPowerSettings = 0;
 	  _csmaEnabled = 0;
 	  _rxBufferLength = 0;
+
+
+
+
+	  mySPI_Init();
+
+
+
+
+
+
 
 	const uint8_t CONFIG[][2] =
 	  {
@@ -225,15 +260,13 @@ void RFM69_init(uint8_t freqBand,uint8_t networkID){
 
 void RFM69_reset()
 {
-  if (0 == _resetGPIO)
-    return;
 
   _init2 = false;
 
   // generate reset impulse
-  GPIO_SetBits(_resetGPIO, _resetPin);
-  delay_ms(1);
-  GPIO_ResetBits(_resetGPIO, _resetPin);
+  GPIO_SetBits(RESET_PORT, RESET_PIN);
+  delay_us(150);
+  GPIO_ResetBits(RESET_PORT, RESET_PIN);
 
   // wait until module is ready
   delay_ms(10);
@@ -578,7 +611,7 @@ void ExtInt_Config(){
 	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
 	  GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-	  /* Connect EXTI Line0 to PA0 pin */
+	  /* Connect EXTI Line3 to PA3 pin */
 	  SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOB, EXTI_PinSource2);
 
 	  /* Configure EXTI Line0 */
@@ -588,7 +621,7 @@ void ExtInt_Config(){
 	  EXTI_InitStructure.EXTI_LineCmd = ENABLE;
 	  EXTI_Init(&EXTI_InitStructure);
 
-	  /* Enable and set EXTI Line0 Interrupt to the lowest priority */
+	  /* Enable and set EXTI Line3 Interrupt to the lowest priority */
 	  NVIC_InitStructure.NVIC_IRQChannel = EXTI3_IRQn;
 	  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
 	  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;

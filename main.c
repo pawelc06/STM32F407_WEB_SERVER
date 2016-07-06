@@ -117,10 +117,13 @@ int main(void) {
 
 	SysTick_Init();
 
-	//prepAll();
+
 
 	/* Initialize system */
 	SystemInit();
+
+	RFM69_GPIO_Init();
+    RFM69_reset();
 
 	/* Init USART6, TX: PC6 for debug */
 	TM_USART_Init(USART6, TM_USART_PinsPack_1, 115200);
@@ -129,7 +132,7 @@ int main(void) {
 
 	printf("Start\r\n");
 
-	mySPI_Init();
+
 
 
 
@@ -147,18 +150,15 @@ int main(void) {
 
 	TM_OneWire_Init(&OneWire1, GPIOD, GPIO_Pin_0);
 
-	printf("[1]\n\r");
 
-	printf("[2]\n\r");
-	RFM69_reset();
-	printf("[3]\n\r");
+
+
 	// init RF module and put it to sleep
 	RFM69_init(RF69_868MHZ, 100);
 
-	printf("[4]\n\r");
 
-	//RFM69_dumpRegisters();
-	//printf("[5]\n\r");
+
+
 
 	RFM69_setAESEncryption("sampleEncryptKey", 16);
 
@@ -170,9 +170,7 @@ int main(void) {
 	// enable CSMA/CA algorithm
 	RFM69_setCSMA(true);
 
-	//RFM69_dumpRegisters();
 
-	//delay_ms(5000);
 
 	// send a packet and let RF module sleep
 	//char testdata[] = {'H', 'e', 'l', 'l', 'o'};
