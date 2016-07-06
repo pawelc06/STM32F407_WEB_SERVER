@@ -28,8 +28,6 @@
 
 #include "rfm69.h"
 
-
-
 /* File variable */
 FIL fil[ETHERNET_MAX_OPEN_FILES];
 /* Fatfs variable */
@@ -39,42 +37,38 @@ FATFS fs;
 TM_RTC_t RTC_Data;
 
 /* Set SSI tags for handling variables */
-static TM_ETHERNET_SSI_t SSI_Tags[] = {
-	"led1_s", /* Tag 0 = led1 status */
-	"led2_s", /* Tag 1 = led2 status */
-	"led3_s", /* Tag 2 = led3 status */
-	"led4_s", /* Tag 3 = led4 status */
-	"srv_adr",/* Tag 4 = server address */
-	"clt_a_c",/* Tag 5 = client all connections */
-	"clt_s_c",/* Tag 6 = client successfull connections */
-	"clt_per",/* Tag 7 = client percentage */
-	"clt_tx", /* Tag 8 = client TX bytes */
-	"clt_rx", /* Tag 9 = client RX bytes */
-	"srv_c",  /* Tag 10 = server all connections */
-	"srv_tx", /* Tag 11 = server TX bytes */
-	"srv_rx", /* Tag 12 = server RX bytes */
-	"mac_adr",/* Tag 13 = MAC address */
-	"gateway",/* Tag 14 = gateway */
-	"netmask",/* Tag 15 = netmask */
-	"link",   /* Tag 16 = link status */
-	"duplex", /* Tag 17 = duplex status */
-	"hardware",/* Tag 18 = hardware where code is running */
-	"rtc_time",/* Tag 19 = current RTC time */
-	"compiled",/* Tag 20 = compiled date and time */
-	"temperature",
-	"voltage",
-	"lFrTimestamp",
-	"inTemp"
-};
+static TM_ETHERNET_SSI_t SSI_Tags[] = { "led1_s", /* Tag 0 = led1 status */
+"led2_s", /* Tag 1 = led2 status */
+"led3_s", /* Tag 2 = led3 status */
+"led4_s", /* Tag 3 = led4 status */
+"srv_adr",/* Tag 4 = server address */
+"clt_a_c",/* Tag 5 = client all connections */
+"clt_s_c",/* Tag 6 = client successfull connections */
+"clt_per",/* Tag 7 = client percentage */
+"clt_tx", /* Tag 8 = client TX bytes */
+"clt_rx", /* Tag 9 = client RX bytes */
+"srv_c", /* Tag 10 = server all connections */
+"srv_tx", /* Tag 11 = server TX bytes */
+"srv_rx", /* Tag 12 = server RX bytes */
+"mac_adr",/* Tag 13 = MAC address */
+"gateway",/* Tag 14 = gateway */
+"netmask",/* Tag 15 = netmask */
+"link", /* Tag 16 = link status */
+"duplex", /* Tag 17 = duplex status */
+"hardware",/* Tag 18 = hardware where code is running */
+"rtc_time",/* Tag 19 = current RTC time */
+"compiled",/* Tag 20 = compiled date and time */
+"temperature", "voltage", "lFrTimestamp", "inTemp" };
 
 /* LED CGI handler */
-const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
-const char * TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]);
+const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
+		char *pcValue[]);
+const char * TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
+		char *pcValue[]);
 
 /* CGI call table, only one CGI used */
-TM_ETHERNET_CGI_t CGI_Handlers[] = {
-	{"/ledaction.cgi", LEDS_CGI_Handler}, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
-	{"/gettemp.cgi", TEMP_CGI_Handler}, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
+TM_ETHERNET_CGI_t CGI_Handlers[] = { { "/ledaction.cgi", LEDS_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
+{ "/gettemp.cgi", TEMP_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
 };
 
 char temperature[16];
@@ -88,8 +82,7 @@ uint8_t targetIp2;
 uint8_t targetIp3;
 uint8_t targetIp4;
 char *rxBuffer;
-volatile uint8_t data_ready=0;
-
+volatile uint8_t data_ready = 0;
 
 volatile unsigned int timestamp;
 time_t timeStructure;
@@ -102,7 +95,7 @@ int main(void) {
 	uint8_t ret = 0;
 	int status = 0;
 	char rx[64];
-	int bytesReceived=0;
+	int bytesReceived = 0;
 
 	/* OneWire working struct */
 	TM_OneWire_t OneWire1;
@@ -135,17 +128,15 @@ int main(void) {
 	/* Enable watchdog, 4 seconds before timeout */
 
 	printf("Start\r\n");
-	//while(1);
-	//spi_init(SPI2);
-		mySPI_Init();
-		//mySPI_SendData(0x15,0x15);
 
-	/*
-	if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_4s)) {
+	mySPI_Init();
 
-		printf("Reset occured because of Watchdog(init)\n");
-	}
-	*/
+
+
+	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_4s)) {
+
+	 printf("Reset occured because of Watchdog(init)\n");
+	 }
 
 
 	/* Initialize delay */
@@ -158,100 +149,85 @@ int main(void) {
 
 	printf("[1]\n\r");
 
-
-
-
-
 	printf("[2]\n\r");
 	RFM69_reset();
 	printf("[3]\n\r");
 	// init RF module and put it to sleep
-		RFM69_init(RF69_868MHZ,100);
+	RFM69_init(RF69_868MHZ, 100);
 
-		printf("[4]\n\r");
+	printf("[4]\n\r");
 
+	//RFM69_dumpRegisters();
+	//printf("[5]\n\r");
 
+	RFM69_setAESEncryption("sampleEncryptKey", 16);
 
-		//RFM69_dumpRegisters();
-		//printf("[5]\n\r");
+	RFM69_sleep();
 
+	// set output power
+	RFM69_setPowerDBm(10); // +10 dBm
 
-		RFM69_setAESEncryption("sampleEncryptKey",16);
+	// enable CSMA/CA algorithm
+	RFM69_setCSMA(true);
 
-		RFM69_sleep();
+	//RFM69_dumpRegisters();
 
-			// set output power
-			RFM69_setPowerDBm(10); // +10 dBm
+	//delay_ms(5000);
 
-			// enable CSMA/CA algorithm
-			RFM69_setCSMA(true);
+	// send a packet and let RF module sleep
+	//char testdata[] = {'H', 'e', 'l', 'l', 'o'};
+	//rfm69.send(testdata, sizeof(testdata));
+	RFM69_sleep();
 
-			//RFM69_dumpRegisters();
+	count = 0;
+	devices = TM_OneWire_First(&OneWire1);
+	while (devices) {
 
-			//delay_ms(5000);
+		count++;
 
-			// send a packet and let RF module sleep
-			//char testdata[] = {'H', 'e', 'l', 'l', 'o'};
-			//rfm69.send(testdata, sizeof(testdata));
-			RFM69_sleep();
+		TM_OneWire_GetFullROM(&OneWire1, device[count - 1]);
 
-		count = 0;
-		devices = TM_OneWire_First(&OneWire1);
-		while (devices) {
+		devices = TM_OneWire_Next(&OneWire1);
+	}
 
-			count++;
+	if (count > 0) {
+		printf("Devices found on 1-wire: %d\n", count);
 
+		for (j = 0; j < count; j++) {
+			for (i = 0; i < 8; i++) {
+				printf("0x%02X ", device[j][i]);
 
-			TM_OneWire_GetFullROM(&OneWire1, device[count - 1]);
-
-
-			devices = TM_OneWire_Next(&OneWire1);
-		}
-
-
-		if (count > 0) {
-			printf("Devices found on 1-wire: %d\n", count);
-
-
-			for (j = 0; j < count; j++) {
-				for (i = 0; i < 8; i++) {
-					printf("0x%02X ", device[j][i]);
-
-				}
-				printf("\n");
 			}
+			printf("\n");
+		}
+	} else {
+		printf("No devices on OneWire.\n");
+	}
+
+	for (i = 0; i < count; i++) {
+
+		TM_DS18B20_SetResolution(&OneWire1, device[i],
+				TM_DS18B20_Resolution_12bits);
+	}
+
+	TM_DS18B20_StartAll(&OneWire1);
+
+	while (!TM_DS18B20_AllDone(&OneWire1))
+		;
+
+	for (i = 0; i < count; i++) {
+
+		if (TM_DS18B20_Read(&OneWire1, device[i], &temps[i])) {
+
+			printf("Temp %d: %2.5f; \n", i, temps[i]);
+			sprintf(inTemp, "%2.1f", temps[i]);
 		} else {
-			printf( "No devices on OneWire.\n");
+
+			printf("Reading error;\n");
 		}
-
-
-
-			for (i = 0; i < count; i++) {
-
-				TM_DS18B20_SetResolution(&OneWire1, device[i], TM_DS18B20_Resolution_12bits);
-			}
-
-
-		TM_DS18B20_StartAll(&OneWire1);
-
-
-		while (!TM_DS18B20_AllDone(&OneWire1));
-
-
-		for (i = 0; i < count; i++) {
-
-			if (TM_DS18B20_Read(&OneWire1, device[i], &temps[i])) {
-
-				printf("Temp %d: %2.5f; \n", i, temps[i]);
-				sprintf(inTemp,"%2.1f",temps[i]);
-			} else {
-
-				printf( "Reading error;\n");
-			}
-		}
+	}
 
 	/*******************************************************/
-
 
 	/* Initialize leds on board */
 	TM_DISCO_LedInit();
@@ -278,7 +254,6 @@ int main(void) {
 	IP4_ADDR(&gtw, 192, 168, 2, 1);
 	IP4_ADDR(&netmask1, 255, 255, 255, 0);
 
-
 	//if (TM_ETHERNET_Init(NULL, NULL, NULL, NULL) == TM_ETHERNET_Result_Ok) {
 	if (TM_ETHERNET_Init(NULL, &ip, &gtw, &netmask1) == TM_ETHERNET_Result_Ok) {
 		/* Successfully initialized */
@@ -288,8 +263,7 @@ int main(void) {
 		TM_DISCO_LedOn(LED_RED);
 	}
 
-	/* Reset watchdog */
-	TM_WATCHDOG_Reset();
+	/* Reset watchdog */TM_WATCHDOG_Reset();
 
 	/* Initialize ethernet server if you want use it, server port 80 */
 	TM_ETHERNETSERVER_Enable(80);
@@ -301,68 +275,56 @@ int main(void) {
 	TM_ETHERNETSERVER_SetCGIHandlers(CGI_Handlers, 2);
 
 	if (!TM_RTC_Init(TM_RTC_ClockSource_Internal)) {
-			/* RTC was first time initialized */
-			/* Do your stuff here */
-			/* eg. set default time */
-		}
+		/* RTC was first time initialized */
+		/* Do your stuff here */
+		/* eg. set default time */
+	}
 
 	/* Read RTC clock */
 	TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
 
-
-
 	/* Print current time to USART */
-	printf("Current date: %02d:%02d:%02d\n", RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+	printf("Current date: %02d:%02d:%02d\n", RTC_Data.hours, RTC_Data.minutes,
+			RTC_Data.seconds);
 
-	/* Reset watchdog */
-	TM_WATCHDOG_Reset();
+	/* Reset watchdog */TM_WATCHDOG_Reset();
 
-	strcpy(get_params,"?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
+	strcpy(get_params, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
 
 	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
 
-
-
-
-	//connResult = TM_ETHERNETCLIENT_Connect("testconn1",192,168,2,100,80,NULL);
-	//connResult = TM_ETHERNETCLIENT_Connect("testconn1",140,211,11,105,80,get_params);
-
-	//NASK: 195.187.242.146
-
-	//168.235.88.213
 	printf("Connecting to host..\r\n");
 	rxBuffer = 0;
 
-	if(connResult == TM_ETHERNET_Result_Ok){
-     //connResult = TM_ETHERNETCLIENT_Connect("api.timezonedb.com",targetIp1,targetIp2,targetIp3,targetIp4,80,get_params);
-		connResult = TM_ETHERNETCLIENT_Connect("api.timezonedb.com",168,235,88,213,80,get_params);
+	if (connResult == TM_ETHERNET_Result_Ok) {
+		//connResult = TM_ETHERNETCLIENT_Connect("api.timezonedb.com",targetIp1,targetIp2,targetIp3,targetIp4,80,get_params);
+		connResult = TM_ETHERNETCLIENT_Connect("api.timezonedb.com", 168, 235,
+				88, 213, 80, get_params);
 
-		if(connResult == TM_ETHERNET_Result_Ok){
+		if (connResult == TM_ETHERNET_Result_Ok) {
 			;
 		}
 	}
 
-	  res = f_mount(&fs,"0:",1);
-	  res = f_open(&file, "0:log/log.txt",FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
-	  res = f_printf(&file,"Current date: %02d.%02d.%04d,%02d:%02d:%02d\n",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
-	  //f_printf(file,"test\r\n");
-	  res = f_close(&file);
-	  res = f_mount(NULL,"",1);
+	res = f_mount(&fs, "0:", 1);
+	res = f_open(&file, "0:log/log.txt", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
+	res = f_printf(&file, "Current date: %02d.%02d.%04d,%02d:%02d:%02d\n",
+			RTC_Data.date, RTC_Data.month, RTC_Data.year + 2000, RTC_Data.hours,
+			RTC_Data.minutes, RTC_Data.seconds);
+	//f_printf(file,"test\r\n");
+	res = f_close(&file);
+	res = f_mount(NULL, "", 1);
 
+	/* Reset watchdog */TM_WATCHDOG_Reset();
 
-	/* Reset watchdog */
-		TM_WATCHDOG_Reset();
+	RFM69_dumpRegisters();
 
-		RFM69_dumpRegisters();
-
-		memset(rx, 0, 64);
+	memset(rx, 0, 64);
 
 	while (1) {
 
-
-
 		/* Update ethernet, call this as fast as possible */
-			TM_ETHERNET_Update();
+		TM_ETHERNET_Update();
 
 #ifdef USE_IRQ
 		bytesReceived = RFM69_receive_non_block(rx, 17);
@@ -388,18 +350,13 @@ int main(void) {
 			}
 		}
 #else
-	  bytesReceived = RFM69_receive(rx, 17);
+		bytesReceived = RFM69_receive(rx, 17);
 #endif
 
-
-
-
-			  /* Reset watchdog */
-			  TM_WATCHDOG_Reset();
-
+		/* Reset watchdog */
+		TM_WATCHDOG_Reset();
 
 	}
-
 
 }
 
@@ -411,7 +368,8 @@ void TM_DELAY_1msHandler(void) {
 }
 
 /* Handle CGI request for LEDS */
-const char* LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
+const char* LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
+		char *pcValue[]) {
 	uint8_t i;
 
 	/* This function handles request like one below: */
@@ -426,54 +384,54 @@ const char* LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *
 			if (strstr(pcParam[i], "ledtoggle")) {
 				/* Switch first character */
 				switch (pcValue[i][0]) {
-					case '1':
-						TM_DISCO_LedToggle(LED_GREEN);
-						break;
-					case '2':
-						TM_DISCO_LedToggle(LED_ORANGE);
-						break;
-					case '3':
-						TM_DISCO_LedToggle(LED_RED);
-						break;
-					case '4':
-						TM_DISCO_LedToggle(LED_BLUE);
-						break;
-					default:
-						break;
+				case '1':
+					TM_DISCO_LedToggle(LED_GREEN);
+					break;
+				case '2':
+					TM_DISCO_LedToggle(LED_ORANGE);
+					break;
+				case '3':
+					TM_DISCO_LedToggle(LED_RED);
+					break;
+				case '4':
+					TM_DISCO_LedToggle(LED_BLUE);
+					break;
+				default:
+					break;
 				}
 			} else if (strstr(pcParam[i], "ledon")) {
 				switch (pcValue[i][0]) {
-					case '1':
-						TM_DISCO_LedOn(LED_GREEN);
-						break;
-					case '2':
-						TM_DISCO_LedOn(LED_ORANGE);
-						break;
-					case '3':
-						TM_DISCO_LedOn(LED_RED);
-						break;
-					case '4':
-						TM_DISCO_LedOn(LED_BLUE);
-						break;
-					default:
-						break;
+				case '1':
+					TM_DISCO_LedOn(LED_GREEN);
+					break;
+				case '2':
+					TM_DISCO_LedOn(LED_ORANGE);
+					break;
+				case '3':
+					TM_DISCO_LedOn(LED_RED);
+					break;
+				case '4':
+					TM_DISCO_LedOn(LED_BLUE);
+					break;
+				default:
+					break;
 				}
 			} else if (strstr(pcParam[i], "ledoff")) {
 				switch (pcValue[i][0]) {
-					case '1':
-						TM_DISCO_LedOff(LED_GREEN);
-						break;
-					case '2':
-						TM_DISCO_LedOff(LED_ORANGE);
-						break;
-					case '3':
-						TM_DISCO_LedOff(LED_RED);
-						break;
-					case '4':
-						TM_DISCO_LedOff(LED_BLUE);
-						break;
-					default:
-						break;
+				case '1':
+					TM_DISCO_LedOff(LED_GREEN);
+					break;
+				case '2':
+					TM_DISCO_LedOff(LED_ORANGE);
+					break;
+				case '3':
+					TM_DISCO_LedOff(LED_RED);
+					break;
+				case '4':
+					TM_DISCO_LedOff(LED_BLUE);
+					break;
+				default:
+					break;
 				}
 			}
 		}
@@ -483,7 +441,8 @@ const char* LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *
 	return "/index.shtml";
 }
 
-const char* TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
+const char* TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
+		char *pcValue[]) {
 	uint8_t i;
 
 	/* This function handles request like one below: */
@@ -498,54 +457,54 @@ const char* TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *
 			if (strstr(pcParam[i], "ledtoggle")) {
 				/* Switch first character */
 				switch (pcValue[i][0]) {
-					case '1':
-						TM_DISCO_LedToggle(LED_GREEN);
-						break;
-					case '2':
-						TM_DISCO_LedToggle(LED_ORANGE);
-						break;
-					case '3':
-						TM_DISCO_LedToggle(LED_RED);
-						break;
-					case '4':
-						TM_DISCO_LedToggle(LED_BLUE);
-						break;
-					default:
-						break;
+				case '1':
+					TM_DISCO_LedToggle(LED_GREEN);
+					break;
+				case '2':
+					TM_DISCO_LedToggle(LED_ORANGE);
+					break;
+				case '3':
+					TM_DISCO_LedToggle(LED_RED);
+					break;
+				case '4':
+					TM_DISCO_LedToggle(LED_BLUE);
+					break;
+				default:
+					break;
 				}
 			} else if (strstr(pcParam[i], "ledon")) {
 				switch (pcValue[i][0]) {
-					case '1':
-						TM_DISCO_LedOn(LED_GREEN);
-						break;
-					case '2':
-						TM_DISCO_LedOn(LED_ORANGE);
-						break;
-					case '3':
-						TM_DISCO_LedOn(LED_RED);
-						break;
-					case '4':
-						TM_DISCO_LedOn(LED_BLUE);
-						break;
-					default:
-						break;
+				case '1':
+					TM_DISCO_LedOn(LED_GREEN);
+					break;
+				case '2':
+					TM_DISCO_LedOn(LED_ORANGE);
+					break;
+				case '3':
+					TM_DISCO_LedOn(LED_RED);
+					break;
+				case '4':
+					TM_DISCO_LedOn(LED_BLUE);
+					break;
+				default:
+					break;
 				}
 			} else if (strstr(pcParam[i], "ledoff")) {
 				switch (pcValue[i][0]) {
-					case '1':
-						TM_DISCO_LedOff(LED_GREEN);
-						break;
-					case '2':
-						TM_DISCO_LedOff(LED_ORANGE);
-						break;
-					case '3':
-						TM_DISCO_LedOff(LED_RED);
-						break;
-					case '4':
-						TM_DISCO_LedOff(LED_BLUE);
-						break;
-					default:
-						break;
+				case '1':
+					TM_DISCO_LedOff(LED_GREEN);
+					break;
+				case '2':
+					TM_DISCO_LedOff(LED_ORANGE);
+					break;
+				case '3':
+					TM_DISCO_LedOff(LED_RED);
+					break;
+				case '4':
+					TM_DISCO_LedOff(LED_BLUE);
+					break;
+				default:
+					break;
 				}
 			}
 		}
@@ -556,35 +515,33 @@ const char* TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[], char *
 }
 
 /* SSI server callback, always is called this callback */
-uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert, int iInsertLen) {
+uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
+		int iInsertLen) {
 	uint8_t status;
-
-
-
 
 	/* Return number of characters written */
 	if (iIndex < 4) {
 		/* First 4 tags are leds */
 		/* Get led status */
 		switch (iIndex) {
-			case 0:
-				/* Green LED */
-				status = TM_DISCO_LedIsOn(LED_GREEN);
-				break;
-			case 1:
-				/* Orange LED */
-				status = TM_DISCO_LedIsOn(LED_ORANGE);
-				break;
-			case 2:
-				/* Red LED */
-				status = TM_DISCO_LedIsOn(LED_RED);
-				break;
-			case 3:
-				/* Blue LED */
-				status = TM_DISCO_LedIsOn(LED_BLUE);
-				break;
-			default:
-				return 0;
+		case 0:
+			/* Green LED */
+			status = TM_DISCO_LedIsOn(LED_GREEN);
+			break;
+		case 1:
+			/* Orange LED */
+			status = TM_DISCO_LedIsOn(LED_ORANGE);
+			break;
+		case 2:
+			/* Red LED */
+			status = TM_DISCO_LedIsOn(LED_RED);
+			break;
+		case 3:
+			/* Blue LED */
+			status = TM_DISCO_LedIsOn(LED_BLUE);
+			break;
+		default:
+			return 0;
 		}
 
 		/* Set string according to status */
@@ -597,19 +554,25 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert, int iInsertLe
 		}
 	} else if (iIndex == 4) {
 		/* #serv_adr tag is requested */
-		sprintf(pcInsert, "%d.%d.%d.%d", TM_ETHERNET_GetLocalIP(0), TM_ETHERNET_GetLocalIP(1), TM_ETHERNET_GetLocalIP(2), TM_ETHERNET_GetLocalIP(3));
+		sprintf(pcInsert, "%d.%d.%d.%d", TM_ETHERNET_GetLocalIP(0),
+				TM_ETHERNET_GetLocalIP(1), TM_ETHERNET_GetLocalIP(2),
+				TM_ETHERNET_GetLocalIP(3));
 	} else if (iIndex == 5) {
 		/* #clt_a_c tag */
 		sprintf(pcInsert, "%u", TM_ETHERNETCLIENT_GetConnectionsCount());
 	} else if (iIndex == 6) {
 		/* #clt_s_c tag */
-		sprintf(pcInsert, "%u", TM_ETHERNETCLIENT_GetSuccessfullConnectionsCount());
+		sprintf(pcInsert, "%u",
+				TM_ETHERNETCLIENT_GetSuccessfullConnectionsCount());
 	} else if (iIndex == 7) {
 		/* #clt_per tag */
 		if (TM_ETHERNETCLIENT_GetConnectionsCount() == 0) {
 			strcpy(pcInsert, "0 %");
 		} else {
-			sprintf(pcInsert, "%f %%", (float)TM_ETHERNETCLIENT_GetSuccessfullConnectionsCount() / (float)TM_ETHERNETCLIENT_GetConnectionsCount() * 100);
+			sprintf(pcInsert, "%f %%",
+					(float) TM_ETHERNETCLIENT_GetSuccessfullConnectionsCount()
+							/ (float) TM_ETHERNETCLIENT_GetConnectionsCount()
+							* 100);
 		}
 	} else if (iIndex == 8) {
 		/* #clt_tx tag */
@@ -629,29 +592,19 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert, int iInsertLe
 	} else if (iIndex == 13) {
 		/* #mac_adr */
 		sprintf(pcInsert, "%02X-%02X-%02X-%02X-%02X-%02X",
-			TM_ETHERNET_GetMACAddr(0),
-			TM_ETHERNET_GetMACAddr(1),
-			TM_ETHERNET_GetMACAddr(2),
-			TM_ETHERNET_GetMACAddr(3),
-			TM_ETHERNET_GetMACAddr(4),
-			TM_ETHERNET_GetMACAddr(5)
-		);
+				TM_ETHERNET_GetMACAddr(0), TM_ETHERNET_GetMACAddr(1),
+				TM_ETHERNET_GetMACAddr(2), TM_ETHERNET_GetMACAddr(3),
+				TM_ETHERNET_GetMACAddr(4), TM_ETHERNET_GetMACAddr(5));
 	} else if (iIndex == 14) {
 		/* #gateway */
-		sprintf(pcInsert, "%d.%d.%d.%d",
-			TM_ETHERNET_GetGateway(0),
-			TM_ETHERNET_GetGateway(1),
-			TM_ETHERNET_GetGateway(2),
-			TM_ETHERNET_GetGateway(3)
-		);
+		sprintf(pcInsert, "%d.%d.%d.%d", TM_ETHERNET_GetGateway(0),
+				TM_ETHERNET_GetGateway(1), TM_ETHERNET_GetGateway(2),
+				TM_ETHERNET_GetGateway(3));
 	} else if (iIndex == 15) {
 		/* #netmask */
-		sprintf(pcInsert, "%d.%d.%d.%d",
-			TM_ETHERNET_GetNetmask(0),
-			TM_ETHERNET_GetNetmask(1),
-			TM_ETHERNET_GetNetmask(2),
-			TM_ETHERNET_GetNetmask(3)
-		);
+		sprintf(pcInsert, "%d.%d.%d.%d", TM_ETHERNET_GetNetmask(0),
+				TM_ETHERNET_GetNetmask(1), TM_ETHERNET_GetNetmask(2),
+				TM_ETHERNET_GetNetmask(3));
 	} else if (iIndex == 16) {
 		/* #link */
 		if (TM_ETHERNET_Is100M()) {
@@ -672,35 +625,25 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert, int iInsertLe
 	} else if (iIndex == 19) {
 		/* #rtc_time */
 		TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
-		sprintf(pcInsert, "%04d-%02d-%02d %02d:%02d:%02d",
-			RTC_Data.year + 2000,
-			RTC_Data.month,
-			RTC_Data.date,
-			RTC_Data.hours,
-			RTC_Data.minutes,
-			RTC_Data.seconds
-		);
+		sprintf(pcInsert, "%04d-%02d-%02d %02d:%02d:%02d", RTC_Data.year + 2000,
+				RTC_Data.month, RTC_Data.date, RTC_Data.hours, RTC_Data.minutes,
+				RTC_Data.seconds);
 	} else if (iIndex == 20) {
 		/* #compiled */
 		strcpy(pcInsert, __DATE__ " at " __TIME__);
-	}
-	else if (iIndex == 21) {
-			/* #temperature */
-			strcpy(pcInsert, temperature);
-		}
-	else if (iIndex == 22) {
-				/* #vbat */
-				strcpy(pcInsert, vbat);
-			}
-	else if (iIndex == 23) {
-					/* #lastFrameTimestamp */
-					strcpy(pcInsert, lastFrameTimestamp);
-				}
-	else if (iIndex == 24) {
-						/* #inTemp */
-						strcpy(pcInsert, inTemp);
-					}
-	else {
+	} else if (iIndex == 21) {
+		/* #temperature */
+		strcpy(pcInsert, temperature);
+	} else if (iIndex == 22) {
+		/* #vbat */
+		strcpy(pcInsert, vbat);
+	} else if (iIndex == 23) {
+		/* #lastFrameTimestamp */
+		strcpy(pcInsert, lastFrameTimestamp);
+	} else if (iIndex == 24) {
+		/* #inTemp */
+		strcpy(pcInsert, inTemp);
+	} else {
 		/* No valid tag */
 		return 0;
 	}
@@ -709,40 +652,33 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert, int iInsertLe
 	return strlen(pcInsert);
 }
 
-void TM_ETHERNET_IPIsSetCallback(uint8_t ip_addr1, uint8_t ip_addr2, uint8_t ip_addr3, uint8_t ip_addr4, uint8_t dhcp) {
+void TM_ETHERNET_IPIsSetCallback(uint8_t ip_addr1, uint8_t ip_addr2,
+		uint8_t ip_addr3, uint8_t ip_addr4, uint8_t dhcp) {
 	/* Called when we have valid IP, it might be static or DHCP */
 
 	if (dhcp) {
 		/* IP set with DHCP */
-		printf("IP: %d.%d.%d.%d assigned by DHCP server\n", ip_addr1, ip_addr2, ip_addr3, ip_addr4);
+		printf("IP: %d.%d.%d.%d assigned by DHCP server\n", ip_addr1, ip_addr2,
+				ip_addr3, ip_addr4);
 	} else {
 		/* Static IP */
-		printf("IP: %d.%d.%d.%d; STATIC IP used\n", ip_addr1, ip_addr2, ip_addr3, ip_addr4);
+		printf("IP: %d.%d.%d.%d; STATIC IP used\n", ip_addr1, ip_addr2,
+				ip_addr3, ip_addr4);
 	}
 
 	/* Print MAC address to user */
-	printf("MAC: %02X-%02X-%02X-%02X-%02X-%02X\n",
-		TM_ETHERNET_GetMACAddr(0),
-		TM_ETHERNET_GetMACAddr(1),
-		TM_ETHERNET_GetMACAddr(2),
-		TM_ETHERNET_GetMACAddr(3),
-		TM_ETHERNET_GetMACAddr(4),
-		TM_ETHERNET_GetMACAddr(5)
-	);
+	printf("MAC: %02X-%02X-%02X-%02X-%02X-%02X\n", TM_ETHERNET_GetMACAddr(0),
+			TM_ETHERNET_GetMACAddr(1), TM_ETHERNET_GetMACAddr(2),
+			TM_ETHERNET_GetMACAddr(3), TM_ETHERNET_GetMACAddr(4),
+			TM_ETHERNET_GetMACAddr(5));
 	/* Print netmask to user */
-	printf("Netmask: %d.%d.%d.%d\n",
-		TM_ETHERNET_GetGateway(0),
-		TM_ETHERNET_GetGateway(1),
-		TM_ETHERNET_GetGateway(2),
-		TM_ETHERNET_GetGateway(3)
-	);
+	printf("Netmask: %d.%d.%d.%d\n", TM_ETHERNET_GetGateway(0),
+			TM_ETHERNET_GetGateway(1), TM_ETHERNET_GetGateway(2),
+			TM_ETHERNET_GetGateway(3));
 	/* Print gateway to user */
-	printf("Gateway: %d.%d.%d.%d\n",
-		TM_ETHERNET_GetNetmask(0),
-		TM_ETHERNET_GetNetmask(1),
-		TM_ETHERNET_GetNetmask(2),
-		TM_ETHERNET_GetNetmask(3)
-	);
+	printf("Gateway: %d.%d.%d.%d\n", TM_ETHERNET_GetNetmask(0),
+			TM_ETHERNET_GetNetmask(1), TM_ETHERNET_GetNetmask(2),
+			TM_ETHERNET_GetNetmask(3));
 	/* Print 100M link status, 1 = 100M, 0 = 10M */
 	printf("Link 100M: %d\n", TM_ETHERNET.speed_100m);
 	/* Print duplex status: 1 = Full, 0 = Half */
@@ -786,17 +722,16 @@ int TM_ETHERNETSERVER_OpenFileCallback(struct fs_file* file, const char* name) {
 	}
 
 	/* Format name, I have on subfolder everything on my SD card */
-	sprintf((char *)buffer, "/www%s", name);
-
-
+	sprintf((char *) buffer, "/www%s", name);
 
 	/* Try to open */
-	fres = f_open(&fil[file->id], buffer, FA_OPEN_EXISTING | FA_READ | FA_WRITE);
+	fres = f_open(&fil[file->id], buffer,
+			FA_OPEN_EXISTING | FA_READ | FA_WRITE);
 
 	/* If not opened OK */
 	if (fres != FR_OK) {
-		printf("Open %s Failure!",buffer);
-		printf("Error Code:%d\r\n",fres);
+		printf("Open %s Failure!", buffer);
+		printf("Error Code:%d\r\n", fres);
 		/* In case we are only opened file, but we didn't succedded */
 		if (*file->opened_files_count == 0) {
 			/* Unmount card, for safety reason */
@@ -806,7 +741,7 @@ int TM_ETHERNETSERVER_OpenFileCallback(struct fs_file* file, const char* name) {
 		/* Return 0, opening error */
 		return 0;
 	} else {
-		printf("Open %s SUCCESS!",buffer);
+		printf("Open %s SUCCESS!", buffer);
 	}
 
 	/* !IMPORTANT; Set file size */
@@ -816,7 +751,8 @@ int TM_ETHERNETSERVER_OpenFileCallback(struct fs_file* file, const char* name) {
 	return 1;
 }
 
-int TM_ETHERNETSERVER_ReadFileCallback(struct fs_file* file, char* buffer, int count) {
+int TM_ETHERNETSERVER_ReadFileCallback(struct fs_file* file, char* buffer,
+		int count) {
 	uint32_t readed;
 
 	/* print debug */
@@ -885,7 +821,4 @@ int fputc(int ch, FILE *f) {
 	/* Return character back */
 	return ch;
 }
-
-
-
 
