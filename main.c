@@ -24,7 +24,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
-#include "rf01.h"
+//#include "rf01.h"
+
+#include "rfm69.h"
+
+
 
 /* File variable */
 FIL fil[ETHERNET_MAX_OPEN_FILES];
@@ -97,6 +101,8 @@ int main(void) {
 
 	uint8_t ret = 0;
 	int status = 0;
+	char rx[64];
+	int bytesReceived=0;
 
 	/* OneWire working struct */
 	TM_OneWire_t OneWire1;
@@ -117,8 +123,8 @@ int main(void) {
 	uint8_t get_params[200];
 
 	SysTick_Init();
-	printf("Prep All\r\n");
-	prepAll();
+
+	//prepAll();
 
 	/* Initialize system */
 	SystemInit();
@@ -128,13 +134,18 @@ int main(void) {
 
 	/* Enable watchdog, 4 seconds before timeout */
 
+	printf("Start\r\n");
+	//while(1);
+	//spi_init(SPI2);
+		mySPI_Init();
+		//mySPI_SendData(0x15,0x15);
 
-
-
+	/*
 	if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_4s)) {
 
 		printf("Reset occured because of Watchdog(init)\n");
 	}
+	*/
 
 
 	/* Initialize delay */
@@ -145,6 +156,44 @@ int main(void) {
 
 	TM_OneWire_Init(&OneWire1, GPIOD, GPIO_Pin_0);
 
+	printf("[1]\n\r");
+
+
+
+
+
+	printf("[2]\n\r");
+	RFM69_reset();
+	printf("[3]\n\r");
+	// init RF module and put it to sleep
+		RFM69_init(RF69_868MHZ,100);
+
+		printf("[4]\n\r");
+
+
+
+		//RFM69_dumpRegisters();
+		//printf("[5]\n\r");
+
+
+		RFM69_setAESEncryption("sampleEncryptKey",16);
+
+		RFM69_sleep();
+
+			// set output power
+			RFM69_setPowerDBm(10); // +10 dBm
+
+			// enable CSMA/CA algorithm
+			RFM69_setCSMA(true);
+
+			//RFM69_dumpRegisters();
+
+			//delay_ms(5000);
+
+			// send a packet and let RF module sleep
+			//char testdata[] = {'H', 'e', 'l', 'l', 'o'};
+			//rfm69.send(testdata, sizeof(testdata));
+			RFM69_sleep();
 
 		count = 0;
 		devices = TM_OneWire_First(&OneWire1);
@@ -213,7 +262,7 @@ int main(void) {
 	/* Display to user */
 	printf("Program starting..\n");
 
-	/* Initialize RTC with internal clock if not already */
+	/* Initialize RTC with external clock if not already */
 	if (!TM_RTC_Init(TM_RTC_ClockSource_External)) {
 		/* Set default time for RTC */
 
@@ -225,8 +274,8 @@ int main(void) {
 	/* All parameters NULL, default options for MAC, static IP, gateway and netmask will be used */
 	/* They are defined in tm_stm32f4_ethernet.h file */
 
-	IP4_ADDR(&ip, 192, 168, 0, 120);
-	IP4_ADDR(&gtw, 192, 168, 0, 1);
+	IP4_ADDR(&ip, 192, 168, 2, 120);
+	IP4_ADDR(&gtw, 192, 168, 2, 1);
 	IP4_ADDR(&netmask1, 255, 255, 255, 0);
 
 
@@ -304,7 +353,9 @@ int main(void) {
 	/* Reset watchdog */
 		TM_WATCHDOG_Reset();
 
+		RFM69_dumpRegisters();
 
+		memset(rx, 0, 64);
 
 	while (1) {
 
@@ -313,71 +364,34 @@ int main(void) {
 		/* Update ethernet, call this as fast as possible */
 			TM_ETHERNET_Update();
 
+#ifdef USE_IRQ
+		bytesReceived = RFM69_receive_non_block(rx, 17);
+		if (bytesReceived == 17) {
+
+			if (rx[2] == 2) {
+
+				printf("Pokoj Kasi:");
+
+				printf(rx + 4);
+				printf(" *\n\r");
+				memset(rx, 0, 64);
+
+			}
+
+			if (rx[2] == 3) {
+
+				printf("Pokoj Basi:");
+				printf(rx + 4);
+				printf(" *\n\r");
+				memset(rx, 0, 64);
+
+			}
+		}
+#else
+	  bytesReceived = RFM69_receive(rx, 17);
+#endif
 
 
-			if( !(RF01_status.stat&0x03) )
-				  rf01_rxstart();
-
-			if( RF01_status.New )	{
-
-					  ret = rf12_rxfinish(buf);
-
-
-					  if(ret > 0 && ret < 254) {	// brak b³êdów CRC - odebrana ramka
-						  printf("Received correct frame: ");
-						  printf(buf);
-						  printf("\n\r");
-
-
-						  /* Start temperature conversion on all devices on one bus */
-
-						  	TM_DS18B20_StartAll(&OneWire1);
-
-
-						  	while (!TM_DS18B20_AllDone(&OneWire1));
-
-
-							for (i = 0; i < count; i++) {
-
-								if (TM_DS18B20_Read(&OneWire1, device[i], &temps[i])) {
-
-									printf("Temp %d: %2.5f; \n", i, temps[i]);
-									sprintf(inTemp,"%2.1f",temps[i]);
-
-								} else {
-
-									printf( "Reading error;\n");
-								}
-							}
-
-
-
-						  if(handleTempData(buf,temperature,vbat)){
-							  printf("Frame has been processed!\n\r");
-							  TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
-
-							  sprintf(lastFrameTimestamp,"%02d.%02d.%04d %02d:%02d:%02d",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
-							  //printf("Current date: %02d.%02d.%04d %02d:%02d:%02d\n",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
-							  puts(lastFrameTimestamp);
-							  puts("\r\n");
-							  res = f_mount(&fs,"0:",1);
-							  res = f_open(&file, "0:www/log.txt",FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
-
-							  /* Move to end of the file to append data */
-							        res = f_lseek(&file, f_size(&file));
-
-							  //res = f_printf(&file,"%02d.%02d.%04d,%02d:%02d:%02d,%s,%s\r\n",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds,temperature,vbat);
-							        res = f_printf(&file,"%s,%s,%s,%s\r\n",lastFrameTimestamp,temperature,inTemp,vbat);
-							  res = f_close(&file);
-							  res = f_mount(NULL,"",1);
-						  } else {
-							  printf("Frame error\n\r");
-						  }
-
-
-					  }
-
-			  }
 
 
 			  /* Reset watchdog */
