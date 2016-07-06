@@ -58,13 +58,16 @@ static TM_ETHERNET_SSI_t SSI_Tags[] = { "led1_s", /* Tag 0 = led1 status */
 "hardware",/* Tag 18 = hardware where code is running */
 "rtc_time",/* Tag 19 = current RTC time */
 "compiled",/* Tag 20 = compiled date and time */
-"temperature", "voltage", "lFrTimestamp", "inTemp" };
+"temperature", "voltage", "lFrTimestamp", "inTemp",
+"temp1","hum1","ts1","temp2","hum2","ts2","temp3","hum3","ts3","temp4","hum4","ts4"};
 
 /* LED CGI handler */
 const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 		char *pcValue[]);
 const char * TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 		char *pcValue[]);
+
+uint8_t parseFrame(char *frame,char *temp,char *hum);
 
 /* CGI call table, only one CGI used */
 TM_ETHERNET_CGI_t CGI_Handlers[] = { { "/ledaction.cgi", LEDS_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
@@ -76,6 +79,23 @@ char temp[10];
 char vbat[10];
 char lastFrameTimestamp[20];
 char inTemp[9];
+char temp1[6];
+char temp2[6];
+char temp3[6];
+char temp4[6];
+
+char hum1[5];
+char hum2[5];
+char hum3[5];
+char hum4[5];
+
+char ts1[20];
+char ts2[20];
+char ts3[20];
+char ts4[20];
+
+
+
 //struct ip_addr ip_targetURL;
 uint8_t targetIp1;
 uint8_t targetIp2;
@@ -266,8 +286,8 @@ int main(void) {
 	/* Initialize ethernet server if you want use it, server port 80 */
 	TM_ETHERNETSERVER_Enable(80);
 
-	/* Set SSI tags, we have 21 SSI tags */
-	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 25);
+	/* Set SSI tags, we have 37 SSI tags */
+	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 37);
 
 	/* Set CGI tags, we have 1 CGI handler, for leds only */
 	TM_ETHERNETSERVER_SetCGIHandlers(CGI_Handlers, 2);
@@ -315,9 +335,11 @@ int main(void) {
 
 	/* Reset watchdog */TM_WATCHDOG_Reset();
 
-	RFM69_dumpRegisters();
+	//RFM69_dumpRegisters();
 
 	memset(rx, 0, 64);
+
+	strcpy(temp1,"+20.0");
 
 	while (1) {
 
@@ -328,22 +350,36 @@ int main(void) {
 		bytesReceived = RFM69_receive_non_block(rx, 17);
 		if (bytesReceived == 17) {
 
+			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
+
+
+
 			if (rx[2] == 2) {
+				printf("[2]\n\r");
+				if (parseFrame(rx+4,temp1,hum1)){
+					sprintf(ts1,"%02d.%02d.%04d %02d:%02d:%02d",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
 
-				printf("Pokoj Kasi:");
+					printf("Pokoj Kasi:");
 
-				printf(rx + 4);
-				printf(" *\n\r");
-				memset(rx, 0, 64);
+					printf(rx + 4);
+					memset(rx, 0, 64);
+				}
+
+
 
 			}
 
 			if (rx[2] == 3) {
+				printf("[3]\n\r");
+				if (parseFrame(rx+4,temp2,hum2)){
 
-				printf("Pokoj Basi:");
-				printf(rx + 4);
-				printf(" *\n\r");
-				memset(rx, 0, 64);
+					sprintf(ts2,"%02d.%02d.%04d %02d:%02d:%02d",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+
+					printf("Pokoj Basi:");
+					printf(rx + 4);
+					printf(" *\n\r");
+					memset(rx, 0, 64);
+				}
 
 			}
 		}
@@ -538,9 +574,16 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 			/* Blue LED */
 			status = TM_DISCO_LedIsOn(LED_BLUE);
 			break;
+
 		default:
 			return 0;
 		}
+
+
+
+
+
+
 
 		/* Set string according to status */
 		if (status) {
@@ -641,7 +684,28 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 	} else if (iIndex == 24) {
 		/* #inTemp */
 		strcpy(pcInsert, inTemp);
-	} else {
+	} else if(iIndex == 25) {
+		/* #temp1 */
+		strcpy(pcInsert, temp1);
+	} else if(iIndex == 26) {
+		/* #hum1 */
+		strcpy(pcInsert, hum1);
+	} else if(iIndex == 27) {
+		/* #ts1 */
+		strcpy(pcInsert, ts1);
+	} else if(iIndex == 28) {
+		/* #temp2 */
+		strcpy(pcInsert, temp2);
+	} else if(iIndex == 29) {
+		/* #hum2 */
+		strcpy(pcInsert, hum2);
+	} else if(iIndex == 30) {
+		/* #ts2 */
+		strcpy(pcInsert, ts2);
+	}
+
+
+	else {
 		/* No valid tag */
 		return 0;
 	}
@@ -818,5 +882,18 @@ int fputc(int ch, FILE *f) {
 
 	/* Return character back */
 	return ch;
+}
+
+uint8_t parseFrame(char *frame,char *temp,char *hum){
+	if(frame[0] == 'T'){
+		strncpy(temp,frame+2,4);
+		temp[4] = 0;
+		strncpy(hum,frame+9,4);
+		hum[4] = 0;
+
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
