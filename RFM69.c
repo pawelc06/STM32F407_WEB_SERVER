@@ -484,9 +484,9 @@ int RFM69_receive_non_block(char* data, uint8_t dataLength){
 	  }
 
 	  // copy only until dataLength, even if packet in local buffer is actually larger
-	if(bytesRead >= dataLength){
-			memcpy(data, _rxBuffer, dataLength);
-	}
+	//if(bytesRead >= dataLength){
+			memcpy(data, _rxBuffer, bytesRead);
+	//}
 
 
 

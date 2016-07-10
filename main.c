@@ -58,7 +58,7 @@ static TM_ETHERNET_SSI_t SSI_Tags[] = { "led1_s", /* Tag 0 = led1 status */
 "hardware",/* Tag 18 = hardware where code is running */
 "rtc_time",/* Tag 19 = current RTC time */
 "compiled",/* Tag 20 = compiled date and time */
-"temperature", "voltage", "lFrTimestamp", "inTemp",
+"outTemp","outHum", "voltage", "lFrTimestamp", "inTemp",
 "temp1","hum1","ts1","temp2","hum2","ts2","temp3","hum3","ts3","temp4","hum4","ts4"};
 
 /* LED CGI handler */
@@ -68,13 +68,15 @@ const char * TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 		char *pcValue[]);
 
 uint8_t parseFrame(char *frame,char *temp,char *hum);
+uint8_t parseFrameV(char *frame,char *temp,char *hum,char *vcc);
 
 /* CGI call table, only one CGI used */
 TM_ETHERNET_CGI_t CGI_Handlers[] = { { "/ledaction.cgi", LEDS_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
 { "/gettemp.cgi", TEMP_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
 };
 
-char temperature[16];
+char outTemp[16];
+char outHum[16];
 char temp[10];
 char vbat[10];
 char lastFrameTimestamp[20];
@@ -287,7 +289,7 @@ int main(void) {
 	TM_ETHERNETSERVER_Enable(80);
 
 	/* Set SSI tags, we have 37 SSI tags */
-	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 37);
+	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 38);
 
 	/* Set CGI tags, we have 1 CGI handler, for leds only */
 	TM_ETHERNETSERVER_SetCGIHandlers(CGI_Handlers, 2);
@@ -339,7 +341,7 @@ int main(void) {
 
 	memset(rx, 0, 64);
 
-	strcpy(temp1,"+20.0");
+	strcpy(outTemp,"+20.0");
 
 	while (1) {
 
@@ -347,12 +349,26 @@ int main(void) {
 		TM_ETHERNET_Update();
 
 #ifdef USE_IRQ
-		bytesReceived = RFM69_receive_non_block(rx, 17);
-		if (bytesReceived == 17) {
+		bytesReceived = RFM69_receive_non_block(rx, 25);
+		if (bytesReceived >= 17) {
 
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
 
 
+			if (rx[2] == 1) { //outTemp
+							printf("[1]\n\r");
+							if (parseFrameV(rx+4,outTemp,outHum,vbat)){
+								sprintf(lastFrameTimestamp,"%02d.%02d.%04d %02d:%02d:%02d",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+
+								printf("Balkon:");
+
+								printf(rx + 4);
+								memset(rx, 0, 64);
+							}
+
+
+
+						}
 
 			if (rx[2] == 2) {
 				printf("[2]\n\r");
@@ -674,32 +690,36 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 		strcpy(pcInsert, __DATE__ " at " __TIME__);
 	} else if (iIndex == 21) {
 		/* #temperature */
-		strcpy(pcInsert, temperature);
+		strcpy(pcInsert, outTemp);
 	} else if (iIndex == 22) {
+		/* #outHum */
+		strcpy(pcInsert, outHum);
+	}
+	else if (iIndex == 23) {
 		/* #vbat */
 		strcpy(pcInsert, vbat);
-	} else if (iIndex == 23) {
+	} else if (iIndex == 24) {
 		/* #lastFrameTimestamp */
 		strcpy(pcInsert, lastFrameTimestamp);
-	} else if (iIndex == 24) {
+	} else if (iIndex == 25) {
 		/* #inTemp */
 		strcpy(pcInsert, inTemp);
-	} else if(iIndex == 25) {
+	} else if(iIndex == 26) {
 		/* #temp1 */
 		strcpy(pcInsert, temp1);
-	} else if(iIndex == 26) {
+	} else if(iIndex == 27) {
 		/* #hum1 */
 		strcpy(pcInsert, hum1);
-	} else if(iIndex == 27) {
+	} else if(iIndex == 28) {
 		/* #ts1 */
 		strcpy(pcInsert, ts1);
-	} else if(iIndex == 28) {
+	} else if(iIndex == 29) {
 		/* #temp2 */
 		strcpy(pcInsert, temp2);
-	} else if(iIndex == 29) {
+	} else if(iIndex == 30) {
 		/* #hum2 */
 		strcpy(pcInsert, hum2);
-	} else if(iIndex == 30) {
+	} else if(iIndex == 31) {
 		/* #ts2 */
 		strcpy(pcInsert, ts2);
 	}
@@ -890,6 +910,22 @@ uint8_t parseFrame(char *frame,char *temp,char *hum){
 		temp[4] = 0;
 		strncpy(hum,frame+9,4);
 		hum[4] = 0;
+
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+uint8_t parseFrameV(char *frame,char *temp,char *hum,char *vcc){
+	if(frame[0] == 'T'){
+		strncpy(temp,frame+2,4);
+		temp[4] = 0;
+		strncpy(hum,frame+9,4);
+		hum[4] = 0;
+
+		strncpy(vcc,frame+16,4);
+		vcc[4] = 0;
 
 		return 1;
 	} else {
