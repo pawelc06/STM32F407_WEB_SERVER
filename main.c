@@ -354,26 +354,40 @@ int main(void) {
 
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
 
-
 			if (rx[2] == 1) { //outTemp
-							printf("[1]\n\r");
-							if (parseFrameV(rx+4,outTemp,outHum,vbat)){
-								sprintf(lastFrameTimestamp,"%02d.%02d.%04d %02d:%02d:%02d",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+				printf("[1]\n\r");
+				if (parseFrameV(rx + 4, outTemp, outHum, vbat)) {
+					sprintf(lastFrameTimestamp, "%02d.%02d.%04d %02d:%02d:%02d",
+							RTC_Data.date, RTC_Data.month, RTC_Data.year + 2000,
+							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
 
-								printf("Balkon:");
+					printf("Balkon:");
 
-								printf(rx + 4);
-								memset(rx, 0, 64);
-							}
+					printf(rx + 4);
+					memset(rx, 0, 64);
 
+					res = f_mount(&fs, "0:", 1);
+					res = f_open(&file, "0:www/log.txt",
+							FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
 
+					/* Move to end of the file to append data */
+					res = f_lseek(&file, f_size(&file));
 
-						}
+					//res = f_printf(&file,"%02d.%02d.%04d,%02d:%02d:%02d,%s,%s\r\n",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds,temperature,vbat);
+					res = f_printf(&file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\r\n", lastFrameTimestamp,
+							outTemp,outHum, inTemp, vbat, ts1,temp1,hum1,ts2,temp2,hum2);
+					res = f_close(&file);
+					res = f_mount(NULL, "", 1);
+				}
+
+			}
 
 			if (rx[2] == 2) {
 				printf("[2]\n\r");
-				if (parseFrame(rx+4,temp1,hum1)){
-					sprintf(ts1,"%02d.%02d.%04d %02d:%02d:%02d",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+				if (parseFrame(rx + 4, temp1, hum1)) {
+					sprintf(ts1, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
+							RTC_Data.month, RTC_Data.year + 2000,
+							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
 
 					printf("Pokoj Kasi:");
 
@@ -381,15 +395,15 @@ int main(void) {
 					memset(rx, 0, 64);
 				}
 
-
-
 			}
 
 			if (rx[2] == 3) {
 				printf("[3]\n\r");
-				if (parseFrame(rx+4,temp2,hum2)){
+				if (parseFrame(rx + 4, temp2, hum2)) {
 
-					sprintf(ts2,"%02d.%02d.%04d %02d:%02d:%02d",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+					sprintf(ts2, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
+							RTC_Data.month, RTC_Data.year + 2000,
+							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
 
 					printf("Pokoj Basi:");
 					printf(rx + 4);
@@ -398,6 +412,9 @@ int main(void) {
 				}
 
 			}
+
+
+
 		}
 #else
 		bytesReceived = RFM69_receive(rx, 17);
