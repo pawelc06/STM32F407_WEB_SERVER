@@ -1,12 +1,4 @@
-/**
- *	Coocox project template for ethernet server.
- *	File to be shown to user is stored on SD card
- *
- *	@author		Tilen Majerle
- *	@email		tilen@majerle.eu
- *	@website	http://stm32f4-discovery.com
- *	@ide		Coocox
- */
+
 /* Include core modules */
 #include "stm32f4xx.h"
 /* Include my libraries here */
@@ -18,8 +10,7 @@
 #include "tm_stm32f4_rtc.h"
 #include "tm_stm32f4_watchdog.h"
 #include "tm_stm32f4_fatfs.h"
-#include "tm_stm32f4_onewire.h"
-#include "tm_stm32f4_ds18b20.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -27,6 +18,7 @@
 //#include "rf01.h"
 
 #include "rfm69.h"
+#include "utils.h"
 
 /* File variable */
 FIL fil[ETHERNET_MAX_OPEN_FILES];
@@ -110,7 +102,7 @@ volatile unsigned int timestamp;
 time_t timeStructure;
 volatile unsigned char buf[16];
 
-#define EXPECTING_SENSORS	1
+
 
 int main(void) {
 
@@ -122,10 +114,7 @@ int main(void) {
 	/* OneWire working struct */
 	TM_OneWire_t OneWire1;
 
-	uint8_t devices, i, j, count, alarm_count;
-	uint8_t device[EXPECTING_SENSORS][8];
-	uint8_t alarm_device[EXPECTING_SENSORS][8];
-	float temps[EXPECTING_SENSORS];
+
 
 	//struct fs_file file;
 	FIL file;
@@ -164,14 +153,15 @@ int main(void) {
 	 }
 
 
+
 	/* Initialize delay */
 	TM_DELAY_Init();
 
 	/************ DS18B20 sensor code *********************/
 	/* Initialize OneWire on pin PD0 */
 
-	TM_OneWire_Init(&OneWire1, GPIOD, GPIO_Pin_0);
-
+	DS_1820_Init(&OneWire1);
+	DS_1820_readTemp(&OneWire1,inTemp);
 
 
 
@@ -199,53 +189,7 @@ int main(void) {
 	//rfm69.send(testdata, sizeof(testdata));
 	RFM69_sleep();
 
-	count = 0;
-	devices = TM_OneWire_First(&OneWire1);
-	while (devices) {
 
-		count++;
-
-		TM_OneWire_GetFullROM(&OneWire1, device[count - 1]);
-
-		devices = TM_OneWire_Next(&OneWire1);
-	}
-
-	if (count > 0) {
-		printf("Devices found on 1-wire: %d\n", count);
-
-		for (j = 0; j < count; j++) {
-			for (i = 0; i < 8; i++) {
-				printf("0x%02X ", device[j][i]);
-
-			}
-			printf("\n");
-		}
-	} else {
-		printf("No devices on OneWire.\n");
-	}
-
-	for (i = 0; i < count; i++) {
-
-		TM_DS18B20_SetResolution(&OneWire1, device[i],
-				TM_DS18B20_Resolution_12bits);
-	}
-
-	TM_DS18B20_StartAll(&OneWire1);
-
-	while (!TM_DS18B20_AllDone(&OneWire1))
-		;
-
-	for (i = 0; i < count; i++) {
-
-		if (TM_DS18B20_Read(&OneWire1, device[i], &temps[i])) {
-
-			printf("Temp %d: %2.5f; \n", i, temps[i]);
-			sprintf(inTemp, "%2.1f", temps[i]);
-		} else {
-
-			printf("Reading error;\n");
-		}
-	}
 
 	/*******************************************************/
 
@@ -270,8 +214,8 @@ int main(void) {
 	/* All parameters NULL, default options for MAC, static IP, gateway and netmask will be used */
 	/* They are defined in tm_stm32f4_ethernet.h file */
 
-	IP4_ADDR(&ip, 192, 168, 2, 120);
-	IP4_ADDR(&gtw, 192, 168, 2, 1);
+	IP4_ADDR(&ip, 192, 168, 0, 120);
+	IP4_ADDR(&gtw, 192, 168, 0, 1);
 	IP4_ADDR(&netmask1, 255, 255, 255, 0);
 
 	//if (TM_ETHERNET_Init(NULL, NULL, NULL, NULL) == TM_ETHERNET_Result_Ok) {
@@ -341,7 +285,7 @@ int main(void) {
 
 	memset(rx, 0, 64);
 
-	strcpy(outTemp,"+20.0");
+
 
 	while (1) {
 
@@ -353,6 +297,7 @@ int main(void) {
 		if (bytesReceived >= 17) {
 
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
+			DS_1820_readTemp(&OneWire1,inTemp);
 
 			if (rx[2] == 1) { //outTemp
 				printf("[1]\n\r");
@@ -379,6 +324,7 @@ int main(void) {
 					res = f_close(&file);
 					res = f_mount(NULL, "", 1);
 				}
+
 
 			}
 
