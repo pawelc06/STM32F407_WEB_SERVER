@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <breakpoints>
 <breakpoint enabled="true" persistant="true" registered="true">
-<resource path="/stm32f4_project/utils.c" type="1"/>
-<marker lineNumber="56" type="org.eclipse.cdt.debug.core.cLineBreakpointMarker">
-<attrib name="message" value="Line breakpoint: utils.c [line: 56]"/>
+<resource path="/stm32f4_project/main.c" type="1"/>
+<marker lineNumber="373" type="org.eclipse.cdt.debug.core.cLineBreakpointMarker">
+<attrib name="message" value="Line breakpoint: main.c [line: 364]"/>
 <attrib name="org.eclipse.cdt.debug.core.condition" value=""/>
 <attrib name="org.eclipse.debug.core.id" value="org.eclipse.cdt.debug.core"/>
 <attrib name="org.eclipse.cdt.debug.core.installCount" value="0"/>
-<attrib name="org.eclipse.cdt.debug.core.sourceHandle" value="D:\CooCox\CoIDE\workspace\STM32F407_WEB_SERVER\utils.c"/>
+<attrib name="org.eclipse.cdt.debug.core.sourceHandle" value="D:\CooCox\CoIDE\workspace\STM32F407_WEB_SERVER\main.c"/>
 <attrib name="org.eclipse.cdt.debug.core.breakpointType" value="0"/>
 <attrib name="org.eclipse.cdt.debug.core.ignoreCount" value="0"/>
 <attrib name="org.eclipse.debug.core.enabled" value="true"/>

@@ -51,7 +51,10 @@ static TM_ETHERNET_SSI_t SSI_Tags[] = { "led1_s", /* Tag 0 = led1 status */
 "rtc_time",/* Tag 19 = current RTC time */
 "compiled",/* Tag 20 = compiled date and time */
 "outTemp","outHum", "voltage", "lFrTimestamp", "inTemp",
-"temp1","hum1","ts1","temp2","hum2","ts2","temp3","hum3","ts3","temp4","hum4","ts4"};
+"temp1","hum1","vbat1","ts1",
+"temp2","hum2","vbat2","ts2",
+"temp3","hum3","vbat3","ts3",
+"temp4","hum4","vbat4","ts4"};
 
 /* LED CGI handler */
 const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
@@ -82,6 +85,11 @@ char hum1[5];
 char hum2[5];
 char hum3[5];
 char hum4[5];
+
+char vbat1[5];
+char vbat2[5];
+char vbat3[5];
+char vbat4[5];
 
 char ts1[20];
 char ts2[20];
@@ -146,11 +154,12 @@ int main(void) {
 
 
 
-
+/*
 	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_4s)) {
 
 	 printf("Reset occured because of Watchdog(init)\n");
 	 }
+	 */
 
 
 
@@ -233,7 +242,7 @@ int main(void) {
 	TM_ETHERNETSERVER_Enable(80);
 
 	/* Set SSI tags, we have 37 SSI tags */
-	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 38);
+	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 44);
 
 	/* Set CGI tags, we have 1 CGI handler, for leds only */
 	TM_ETHERNETSERVER_SetCGIHandlers(CGI_Handlers, 2);
@@ -299,6 +308,7 @@ int main(void) {
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
 			DS_1820_readTemp(&OneWire1,inTemp);
 
+
 			if (rx[2] == 1) { //outTemp
 				printf("[1]\n\r");
 				if (parseFrameV(rx + 4, outTemp, outHum, vbat)) {
@@ -330,7 +340,7 @@ int main(void) {
 
 			if (rx[2] == 2) {
 				printf("[2]\n\r");
-				if (parseFrame(rx + 4, temp1, hum1)) {
+				if (parseFrameV(rx + 4, temp1, hum1,vbat1)) {
 					sprintf(ts1, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
@@ -345,7 +355,7 @@ int main(void) {
 
 			if (rx[2] == 3) {
 				printf("[3]\n\r");
-				if (parseFrame(rx + 4, temp2, hum2)) {
+				if (parseFrameV(rx + 4, temp2, hum2,vbat2)) {
 
 					sprintf(ts2, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
@@ -358,6 +368,22 @@ int main(void) {
 				}
 
 			}
+
+			if (rx[2] == 4) {
+							printf("[4]\n\r");
+							if (parseFrameV(rx + 4, temp3, hum3,vbat3)) {
+
+								sprintf(ts3, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
+										RTC_Data.month, RTC_Data.year + 2000,
+										RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+
+								printf("Sypialnia:");
+								printf(rx + 4);
+								printf(" *\n\r");
+								memset(rx, 0, 64);
+							}
+
+						}
 
 
 
@@ -674,17 +700,38 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 		/* #hum1 */
 		strcpy(pcInsert, hum1);
 	} else if(iIndex == 28) {
+		/* #vbat11 */
+		strcpy(pcInsert, vbat1);
+	}
+
+
+	else if(iIndex == 29) {
 		/* #ts1 */
 		strcpy(pcInsert, ts1);
-	} else if(iIndex == 29) {
+	} else if(iIndex == 30) {
 		/* #temp2 */
 		strcpy(pcInsert, temp2);
-	} else if(iIndex == 30) {
+	} else if(iIndex == 31) {
 		/* #hum2 */
 		strcpy(pcInsert, hum2);
-	} else if(iIndex == 31) {
+	} else if(iIndex == 32) {
+		/* #vbat2 */
+		strcpy(pcInsert, vbat2);
+	} else if(iIndex == 33) {
 		/* #ts2 */
 		strcpy(pcInsert, ts2);
+	} else if(iIndex == 34) {
+		/* #temp3 */
+		strcpy(pcInsert, temp3);
+	} else if(iIndex == 35) {
+		/* #hum3 */
+		strcpy(pcInsert, hum3);
+	} else if(iIndex == 36) {
+		/* #vbat3 */
+		strcpy(pcInsert, vbat3);
+	} else if(iIndex == 37) {
+		/* #ts3 */
+		strcpy(pcInsert, ts3);
 	}
 
 
