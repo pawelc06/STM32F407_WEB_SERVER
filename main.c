@@ -19,6 +19,8 @@
 
 #include "rfm69.h"
 #include "utils.h"
+#include "HTU21D.h"
+#include "tm_stm32f4_i2c.h"
 
 /* File variable */
 FIL fil[ETHERNET_MAX_OPEN_FILES];
@@ -54,7 +56,8 @@ static TM_ETHERNET_SSI_t SSI_Tags[] = { "led1_s", /* Tag 0 = led1 status */
 "temp1","hum1","vbat1","ts1",
 "temp2","hum2","vbat2","ts2",
 "temp3","hum3","vbat3","ts3",
-"temp4","hum4","vbat4","ts4"};
+"temp4","hum4","vbat4","ts4",
+"temp0","hum0"};
 
 /* LED CGI handler */
 const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
@@ -76,11 +79,14 @@ char temp[10];
 char vbat[10];
 char lastFrameTimestamp[20];
 char inTemp[9];
+
+char temp0[6];
 char temp1[6];
 char temp2[6];
 char temp3[6];
 char temp4[6];
 
+char hum0[5];
 char hum1[5];
 char hum2[5];
 char hum3[5];
@@ -127,6 +133,7 @@ int main(void) {
 	//struct fs_file file;
 	FIL file;
 	FRESULT res;
+	float hum0f,temp0f;
 
 	struct ip_addr ip;
 	struct ip_addr gtw;
@@ -141,6 +148,15 @@ int main(void) {
 	/* Initialize system */
 	SystemInit();
 
+	/* Initialize I2C, SCL: PB6 and SDA: PB7 with 100kHt serial clock */
+	TM_I2C_Init(I2C1, TM_I2C_PinsPack_1, 400000);
+
+	//hum0f = readHumidity();
+	//temp0f = readTemperature();
+
+
+
+
 	RFM69_GPIO_Init();
     RFM69_reset();
 
@@ -154,12 +170,12 @@ int main(void) {
 
 
 
-/*
+
 	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_4s)) {
 
 	 printf("Reset occured because of Watchdog(init)\n");
 	 }
-	 */
+
 
 
 
@@ -236,7 +252,8 @@ int main(void) {
 		TM_DISCO_LedOn(LED_RED);
 	}
 
-	/* Reset watchdog */TM_WATCHDOG_Reset();
+	/* Reset watchdog */
+	TM_WATCHDOG_Reset();
 
 	/* Initialize ethernet server if you want use it, server port 80 */
 	TM_ETHERNETSERVER_Enable(80);
@@ -294,7 +311,8 @@ int main(void) {
 
 	memset(rx, 0, 64);
 
-
+	strcpy(hum0,"55.5");
+	strcpy(temp0,"22.5");
 
 	while (1) {
 
@@ -307,6 +325,20 @@ int main(void) {
 
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
 			DS_1820_readTemp(&OneWire1,inTemp);
+
+
+			hum0f = readHumidity();
+			temp0f = readTemperature();
+
+			//hum0f = 33.5f;
+			//temp0f = 28.2f;
+
+
+			sprintf(hum0,"%2.1f",hum0f);
+			sprintf(temp0,"%2.1f",temp0f);
+
+
+
 
 
 			if (rx[2] == 1) { //outTemp
@@ -683,8 +715,7 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 	} else if (iIndex == 22) {
 		/* #outHum */
 		strcpy(pcInsert, outHum);
-	}
-	else if (iIndex == 23) {
+	} else if (iIndex == 23) {
 		/* #vbat */
 		strcpy(pcInsert, vbat);
 	} else if (iIndex == 24) {
@@ -702,10 +733,7 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 	} else if(iIndex == 28) {
 		/* #vbat11 */
 		strcpy(pcInsert, vbat1);
-	}
-
-
-	else if(iIndex == 29) {
+	} else if(iIndex == 29) {
 		/* #ts1 */
 		strcpy(pcInsert, ts1);
 	} else if(iIndex == 30) {
@@ -732,10 +760,13 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 	} else if(iIndex == 37) {
 		/* #ts3 */
 		strcpy(pcInsert, ts3);
-	}
-
-
-	else {
+	} else if(iIndex == 42) {
+		/* #temp0 */
+		strcpy(pcInsert, temp0);
+	} else if(iIndex == 43) {
+		/* #hum0 */
+		strcpy(pcInsert, hum0);
+	} else {
 		/* No valid tag */
 		return 0;
 	}
