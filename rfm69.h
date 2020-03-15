@@ -34,10 +34,13 @@
 #define RF69_868MHZ            86
 #define RF69_915MHZ            91
 
+
 #define TIMEOUT_MODE_READY    100 ///< Maximum amount of time until mode switch [ms]
 #define TIMEOUT_PACKET_SENT   100 ///< Maximum amount of time until packet must be sent [ms]
 #define TIMEOUT_CSMA_READY    500 ///< Maximum CSMA wait time for channel free detection [ms]
 #define CSMA_RSSI_THRESHOLD   -85 ///< If RSSI value is smaller than this, consider channel as free [dBm]
+
+#define RF69_CSMA_LIMIT_MS 1000
 
 #define USE_IRQ 1
 
@@ -93,7 +96,9 @@ int RFM69_receive_non_block(char* data, uint8_t dataLength);
 
   void setCustomConfig(const uint8_t config[][2], unsigned int length);
 
-  int send(const void* data, unsigned int dataLength);
+  //int RFM69_send(const void* data, unsigned int dataLength);
+  int RFM69_send(char* data, unsigned int dataLength, uint16_t nodeId);
+  //void send(uint8_t toAddress, const void* buffer, uint8_t bufferSize, bool requestACK);
 
   int RFM69_receive(char* data, unsigned int dataLength);
 

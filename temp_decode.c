@@ -40,9 +40,13 @@ unsigned char calculate_crc(char * buffer){
 }
 
 unsigned char splitData(char *data,char *temp,char *voltage){
-	my_strncpy(temp,data,6);
-	temp[5] = 0;
-	my_strncpy(voltage,data+6,5);
+
+		my_strncpy(temp,data,5);
+		temp[5] = 0;
+		my_strncpy(voltage,data+6,5);
+
+
+
 	//voltage[4] = 0;
 	//voltage[5] = 'V';
 

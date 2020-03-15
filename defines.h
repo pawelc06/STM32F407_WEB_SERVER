@@ -28,6 +28,8 @@
 #ifndef TM_DEFINES_H
 #define TM_DEFINES_H
 
+//#define ETHERNET_USE_DHCP
+
 /* Use SPI for SD card */
 #define FATFS_USE_SDIO				1
 #define FATFS_SDIO_4BIT   0

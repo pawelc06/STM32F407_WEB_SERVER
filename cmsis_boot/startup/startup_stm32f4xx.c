@@ -24,7 +24,9 @@
 //#define STACK_SIZE       0x00000200      /*!< The Stack size suggest using even number    */
 //#define STACK_SIZE       0x00000400      /*!< The Stack size suggest using even number    */
 //#define STACK_SIZE       0x00000800      /*!< The Stack size suggest using even number    */
-#define STACK_SIZE       0x00003000      /*!< The Stack size suggest using even number    */
+//#define STACK_SIZE       0x00003500      /*!< The Stack size suggest using even number    */
+#define STACK_SIZE       0x00002170
+
 __attribute__ ((section(".co_stack")))
 unsigned long pulStack[STACK_SIZE];
 

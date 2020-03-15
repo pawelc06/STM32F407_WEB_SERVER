@@ -1,4 +1,3 @@
-
 /* Include core modules */
 #include "stm32f4xx.h"
 /* Include my libraries here */
@@ -10,6 +9,8 @@
 #include "tm_stm32f4_rtc.h"
 #include "tm_stm32f4_watchdog.h"
 #include "tm_stm32f4_fatfs.h"
+#include "tm_stm32f4_adc.h"
+#include "tm_stm32f4_id.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,7 @@
 #include "utils.h"
 #include "HTU21D.h"
 #include "tm_stm32f4_i2c.h"
+#include "mjson.h"
 
 /* File variable */
 FIL fil[ETHERNET_MAX_OPEN_FILES];
@@ -32,6 +34,7 @@ TM_RTC_t RTC_Data;
 
 /* Set SSI tags for handling variables */
 static TM_ETHERNET_SSI_t SSI_Tags[] = { "led1_s", /* Tag 0 = led1 status */
+
 "led2_s", /* Tag 1 = led2 status */
 "led3_s", /* Tag 2 = led3 status */
 "led4_s", /* Tag 3 = led4 status */
@@ -52,12 +55,10 @@ static TM_ETHERNET_SSI_t SSI_Tags[] = { "led1_s", /* Tag 0 = led1 status */
 "hardware",/* Tag 18 = hardware where code is running */
 "rtc_time",/* Tag 19 = current RTC time */
 "compiled",/* Tag 20 = compiled date and time */
-"outTemp","outHum", "voltage", "lFrTimestamp", "inTemp",
-"temp1","hum1","vbat1","ts1",
-"temp2","hum2","vbat2","ts2",
-"temp3","hum3","vbat3","ts3",
-"temp4","hum4","vbat4","ts4",
-"temp0","hum0"};
+"outTemp", "outHum", "voltage", "lFrTimestamp", "inTemp", "temp1", "hum1",
+		"vbat1", "ts1", "temp2", "hum2", "vbat2", "ts2", "temp3", "hum3",
+		"vbat3", "ts3", "temp4", "hum4", "vbat4", "ts4", "temp0", "hum0",
+		"vbat0" };
 
 /* LED CGI handler */
 const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
@@ -65,8 +66,8 @@ const char * LEDS_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 const char * TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 		char *pcValue[]);
 
-uint8_t parseFrame(char *frame,char *temp,char *hum);
-uint8_t parseFrameV(char *frame,char *temp,char *hum,char *vcc);
+uint8_t parseFrame(char *frame, char *temp, char *hum);
+uint8_t parseFrameV(char *frame, char *temp, char *hum, char *vcc);
 
 /* CGI call table, only one CGI used */
 TM_ETHERNET_CGI_t CGI_Handlers[] = { { "/ledaction.cgi", LEDS_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
@@ -77,7 +78,10 @@ char outTemp[16];
 char outHum[16];
 char temp[10];
 char vbat[10];
-char lastFrameTimestamp[20];
+char lastFrameTimestamp[21];
+char lastFrameTimestampWithSpace[21];
+char serverSensorsData[21];
+
 char inTemp[9];
 
 char temp0[6];
@@ -92,6 +96,7 @@ char hum2[5];
 char hum3[5];
 char hum4[5];
 
+char vbat0[5];
 char vbat1[5];
 char vbat2[5];
 char vbat3[5];
@@ -101,8 +106,6 @@ char ts1[20];
 char ts2[20];
 char ts3[20];
 char ts4[20];
-
-
 
 //struct ip_addr ip_targetURL;
 uint8_t targetIp1;
@@ -115,8 +118,85 @@ volatile uint8_t data_ready = 0;
 volatile unsigned int timestamp;
 time_t timeStructure;
 volatile unsigned char buf[16];
+volatile uint32_t salonIntCounter = 0;
+volatile bool salonPendingMsg = false;
 
+uint8_t mac_address[6];
+uint8_t ip_address[] = { 192, 168, 0, 120 };
+uint8_t i;
 
+uint8_t timeapiIpAddr[4];
+volatile bool timeapiIpAddrFoundFlag = false;
+volatile bool dnsCallbackCalled = false;
+volatile bool dhcpAddrSet = false;
+
+static char status[10];
+static char message[10];
+static char countryCode[10];
+static char zoneName[20];
+static char abbreviation[10];
+static char gmtOffset[10];
+static char dst[10];
+char json_buffer[2048];
+
+static const struct json_attr_t json_attrs[] =
+		{ { "status", t_string, .addr.string = status, .len = sizeof(status) },
+				{ "message", t_string, .addr.string = message, .len =
+						sizeof(message) },
+				{ "countryCode", t_string, .addr.string = countryCode, .len =
+						sizeof(countryCode) }, { "zoneName", t_string,
+						.addr.string = zoneName, .len = sizeof(zoneName) }, {
+						"abbreviation", t_string, .addr.string = abbreviation,
+						.len = sizeof(abbreviation) }, { "gmtOffset", t_string,
+						.addr.string = gmtOffset, .len = sizeof(gmtOffset) },
+				{ "dst", t_string, .addr.string = dst, .len = sizeof(dst) }, {
+						"timestamp", t_uinteger, .addr.uinteger = &timestamp },
+				{ NULL }, };
+
+void updateVbat0(char * vbat0) {
+	float vbat0f;
+
+	vbat0f = (float) TM_ADC_ReadVbat(ADC1);
+	vbat0f = vbat0f / 1000.0f;
+	sprintf(vbat0, "%1.2f", vbat0f);
+}
+
+void setRTCAlarmForTimeSynchronization() {
+	/* Struct for alarm time */
+	TM_RTC_AlarmTime_t AlarmTime;
+
+	/* Set alarm A each day 1 (Monday) in a week */
+	/* Alarm will be first triggered 5 seconds later as time is configured for RTC */
+	AlarmTime.hours = 00;
+	AlarmTime.minutes = 01;
+	AlarmTime.seconds = 00;
+	AlarmTime.alarmtype = TM_RTC_AlarmType_DayInWeek;
+	AlarmTime.day = 7;
+
+	/* Set RTC alarm A, time in binary format */
+	TM_RTC_SetAlarm(TM_RTC_Alarm_A, &AlarmTime, TM_RTC_Format_BIN);
+}
+
+/* Custom request handler function */
+/* Called on alarm A interrupt */
+void TM_RTC_AlarmAHandler(void) {
+	/* Show user to USART */
+	printf("Alarm A triggered!\n");
+	TM_ETHERNETCLIENT_Connect("api.timezonedb.com", timeapiIpAddr[0], timeapiIpAddr[1], timeapiIpAddr[2], timeapiIpAddr[3], 80,
+			"?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
+
+	/* Disable Alarm so it will not trigger next week at the same time */
+	//TM_RTC_DisableAlarm(TM_RTC_Alarm_A);
+}
+
+void TM_RTC_RequestHandler(void) {
+
+	salonIntCounter++;
+	if (salonIntCounter % 6 == 0) {
+		salonPendingMsg = true;
+	}
+
+}
 
 int main(void) {
 
@@ -128,37 +208,30 @@ int main(void) {
 	/* OneWire working struct */
 	TM_OneWire_t OneWire1;
 
-
-
 	//struct fs_file file;
 	FIL file;
 	FRESULT res;
-	float hum0f,temp0f;
+	float hum0f, temp0f;
 
 	struct ip_addr ip;
 	struct ip_addr gtw;
 	struct ip_addr netmask1;
 	TM_ETHERNET_Result_t connResult;
-	uint8_t get_params[200];
+	//uint8_t get_params[200];
 
 	SysTick_Init();
-
-
 
 	/* Initialize system */
 	SystemInit();
 
 	/* Initialize I2C, SCL: PB6 and SDA: PB7 with 100kHt serial clock */
-	TM_I2C_Init(I2C1, TM_I2C_PinsPack_1, 400000);
+	TM_I2C_Init(I2C1, TM_I2C_PinsPack_1, 100000);
 
-	//hum0f = readHumidity();
+	hum0f = readHumidity();
 	//temp0f = readTemperature();
 
-
-
-
 	RFM69_GPIO_Init();
-    RFM69_reset();
+	RFM69_reset();
 
 	/* Init USART6, TX: PC6 for debug */
 	TM_USART_Init(USART6, TM_USART_PinsPack_1, 115200);
@@ -168,15 +241,9 @@ int main(void) {
 	printf("Start\r\n");
 
 
-
-
-
-	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_4s)) {
-
+	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_16s)) {
 	 printf("Reset occured because of Watchdog(init)\n");
 	 }
-
-
 
 
 	/* Initialize delay */
@@ -185,36 +252,46 @@ int main(void) {
 	/************ DS18B20 sensor code *********************/
 	/* Initialize OneWire on pin PD0 */
 
-	DS_1820_Init(&OneWire1);
-	DS_1820_readTemp(&OneWire1,inTemp);
+	//DS_1820_Init(&OneWire1);
+	//DS_1820_readTemp(&OneWire1, inTemp);
+	/* Initialize ADC1 */
+	TM_ADC_InitADC(ADC1);
 
+	/* Enable vbat channel */
+	TM_ADC_EnableVbat();
 
+	updateVbat0(vbat0);
 
 	// init RF module and put it to sleep
 	RFM69_init(RF69_868MHZ, 100);
 
-
-
-
-
 	RFM69_setAESEncryption("sampleEncryptKey", 16);
+	// send a packet and let RF module sleep
 
-	RFM69_sleep();
+	RFM69_dumpRegisters();
+
+	char testdata[18];
+	float humd = 55.5f;
+	float temp = 33.3f;
+
+	char temps[5];
+	char humds[5];
+	unsigned char payload[24];
+	int sentResult;
+	char outTempBuf[21];
+
+	char urlParamStr[75];
+
+	//RFM69_sleep();
 
 	// set output power
 	RFM69_setPowerDBm(10); // +10 dBm
 
 	// enable CSMA/CA algorithm
 	RFM69_setCSMA(true);
+	//RFM69_setCSMA(false);
 
-
-
-	// send a packet and let RF module sleep
-	//char testdata[] = {'H', 'e', 'l', 'l', 'o'};
-	//rfm69.send(testdata, sizeof(testdata));
 	RFM69_sleep();
-
-
 
 	/*******************************************************/
 
@@ -229,11 +306,11 @@ int main(void) {
 
 	/* Initialize RTC with external clock if not already */
 	if (!TM_RTC_Init(TM_RTC_ClockSource_External)) {
-		/* Set default time for RTC */
 
-		/* Set date and time if RTC is not initialized already */
-		//TM_RTC_SetDateTimeString("24.04.16.6;18:28:30");
 	};
+
+	TM_RTC_Interrupts(TM_RTC_Int_10s);
+	setRTCAlarmForTimeSynchronization();
 
 	/* Initialize ethernet peripheral */
 	/* All parameters NULL, default options for MAC, static IP, gateway and netmask will be used */
@@ -243,8 +320,16 @@ int main(void) {
 	IP4_ADDR(&gtw, 192, 168, 0, 1);
 	IP4_ADDR(&netmask1, 255, 255, 255, 0);
 
-	//if (TM_ETHERNET_Init(NULL, NULL, NULL, NULL) == TM_ETHERNET_Result_Ok) {
-	if (TM_ETHERNET_Init(NULL, &ip, &gtw, &netmask1) == TM_ETHERNET_Result_Ok) {
+	/* Set MAC address from unique ID */
+	for (i = 0; i < 6; i++) {
+		/* Set MAC addr */
+		mac_address[i] = TM_ID_GetUnique8(11 - i);
+	}
+
+	/* Initialize ethernet peripheral */
+	/* Set MAC address, set IP address which will be used in case DHCP can't get IP from router */
+	if (TM_ETHERNET_Init(mac_address, ip_address, NULL, NULL)
+			== TM_ETHERNET_Result_Ok) {
 		/* Successfully initialized */
 		TM_DISCO_LedOn(LED_GREEN);
 	} else {
@@ -252,14 +337,24 @@ int main(void) {
 		TM_DISCO_LedOn(LED_RED);
 	}
 
+	/*
+	 if (TM_ETHERNET_Init(NULL, &ip, &gtw, &netmask1) == TM_ETHERNET_Result_Ok) {
+
+	 TM_DISCO_LedOn(LED_GREEN);
+	 } else {
+
+	 TM_DISCO_LedOn(LED_RED);
+	 }
+	 */
+
 	/* Reset watchdog */
 	TM_WATCHDOG_Reset();
 
 	/* Initialize ethernet server if you want use it, server port 80 */
-	TM_ETHERNETSERVER_Enable(80);
+	connResult = TM_ETHERNETSERVER_Enable(80);
 
 	/* Set SSI tags, we have 37 SSI tags */
-	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 44);
+	TM_ETHERNETSERVER_SetSSITags(SSI_Tags, 45);
 
 	/* Set CGI tags, we have 1 CGI handler, for leds only */
 	TM_ETHERNETSERVER_SetCGIHandlers(CGI_Handlers, 2);
@@ -279,31 +374,8 @@ int main(void) {
 
 	/* Reset watchdog */TM_WATCHDOG_Reset();
 
-	strcpy(get_params, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
 
-	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
-
-	printf("Connecting to host..\r\n");
 	rxBuffer = 0;
-
-	if (connResult == TM_ETHERNET_Result_Ok) {
-		//connResult = TM_ETHERNETCLIENT_Connect("api.timezonedb.com",targetIp1,targetIp2,targetIp3,targetIp4,80,get_params);
-		connResult = TM_ETHERNETCLIENT_Connect("api.timezonedb.com", 168, 235,
-				88, 213, 80, get_params);
-
-		if (connResult == TM_ETHERNET_Result_Ok) {
-			;
-		}
-	}
-
-	res = f_mount(&fs, "0:", 1);
-	res = f_open(&file, "0:log/log.txt", FA_OPEN_ALWAYS | FA_WRITE | FA_READ);
-	res = f_printf(&file, "Current date: %02d.%02d.%04d,%02d:%02d:%02d\n",
-			RTC_Data.date, RTC_Data.month, RTC_Data.year + 2000, RTC_Data.hours,
-			RTC_Data.minutes, RTC_Data.seconds);
-	//f_printf(file,"test\r\n");
-	res = f_close(&file);
-	res = f_mount(NULL, "", 1);
 
 	/* Reset watchdog */TM_WATCHDOG_Reset();
 
@@ -311,47 +383,79 @@ int main(void) {
 
 	memset(rx, 0, 64);
 
-	strcpy(hum0,"55.5");
-	strcpy(temp0,"22.5");
+	strcpy(outHum, "0.0");
+	strcpy(outTemp, "0.0");
+
+	strcpy(hum0, "0.0");
+	strcpy(temp0, "0.0");
+	strcpy(vbat, "0.0");
+
+	strcpy(hum1, "0.0");
+	strcpy(temp1, "0.0");
+	strcpy(vbat1, "0.0");
+
+	strcpy(hum2, "0.0");
+	strcpy(temp2, "0.0");
+	strcpy(vbat2, "0.0");
+
+	strcpy(hum3, "0.0");
+	strcpy(temp3, "0.0");
+	strcpy(vbat3, "0.0");
 
 	while (1) {
 
 		/* Update ethernet, call this as fast as possible */
 		TM_ETHERNET_Update();
 
-#ifdef USE_IRQ
-		bytesReceived = RFM69_receive_non_block(rx, 25);
-		if (bytesReceived >= 17) {
-
-			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
-			DS_1820_readTemp(&OneWire1,inTemp);
-
-
+		if (salonPendingMsg) {
 			hum0f = readHumidity();
 			temp0f = readTemperature();
 
 			//hum0f = 33.5f;
 			//temp0f = 28.2f;
 
+			sprintf(hum0, "%2.1f", hum0f);
+			sprintf(temp0, "%2.1f", temp0f);
+			updateVbat0(vbat0);
+			printf("Salon [0] T:%s H:%s\n\r", temp0, hum0);
 
-			sprintf(hum0,"%2.1f",hum0f);
-			sprintf(temp0,"%2.1f",temp0f);
+			sprintf(urlParamStr,
+					"json.htm?type=command&param=udevice&idx=5&nvalue=0&svalue=%s;%s;0",
+					temp0, hum0);
 
+			connResult = TM_ETHERNETCLIENT_Connect("domoticz2", 192, 168, 0, 35,
+					8080, urlParamStr);
+			salonPendingMsg = false;
+		}
 
+#ifdef USE_IRQ
+		bytesReceived = RFM69_receive_non_block(rx, 25);
+		if (bytesReceived >= 17) {
 
-
+			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
+			//DS_1820_readTemp(&OneWire1, inTemp);
 
 			if (rx[2] == 1) { //outTemp
+
 				printf("[1]\n\r");
 				if (parseFrameV(rx + 4, outTemp, outHum, vbat)) {
 					sprintf(lastFrameTimestamp, "%02d.%02d.%04d %02d:%02d:%02d",
 							RTC_Data.date, RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
 
-					printf("Balkon:");
+					sprintf(outTempBuf, "T:%s H:%s V:%s", outTemp, outHum,
+							vbat);
+					sentResult = RFM69_send(outTempBuf, 20, 7);
+					sprintf(urlParamStr,
+							"json.htm?type=command&param=udevice&idx=1&nvalue=0&svalue=%s;%s;0",
+							outTemp, outHum);
 
-					printf(rx + 4);
-					memset(rx, 0, 64);
+					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
+							0, 35, 8080, urlParamStr);
+
+					//printf("Balkon:");
+
+					//printf(rx + 4);
 
 					res = f_mount(&fs, "0:", 1);
 					res = f_open(&file, "0:www/log.txt",
@@ -361,18 +465,29 @@ int main(void) {
 					res = f_lseek(&file, f_size(&file));
 
 					//res = f_printf(&file,"%02d.%02d.%04d,%02d:%02d:%02d,%s,%s\r\n",RTC_Data.date,RTC_Data.month, RTC_Data.year+2000, RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds,temperature,vbat);
-					res = f_printf(&file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\r\n", lastFrameTimestamp,
-							outTemp,outHum, inTemp, vbat, ts1,temp1,hum1,ts2,temp2,hum2);
+					res = f_printf(&file,
+							"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\r\n",
+							lastFrameTimestamp, outTemp, outHum, inTemp, vbat,
+							ts1, temp1, hum1, ts2, temp2, hum2);
 					res = f_close(&file);
 					res = f_mount(NULL, "", 1);
-				}
+					//GPIO_ToggleBits(GPIOB, GPIO_Pin_5);
+					strcpy(lastFrameTimestampWithSpace, lastFrameTimestamp);
+					strcat(lastFrameTimestampWithSpace, " ");
+					//delay_ms(50);
+					//GPIO_ToggleBits(GPIOB, GPIO_Pin_5);
+					//GPIO_ToggleBits(GPIOB, GPIO_Pin_5);
 
+					sentResult = RFM69_send(lastFrameTimestampWithSpace, 20, 6);
+					//GPIO_ToggleBits(GPIOB, GPIO_Pin_5);
+					memset(rx, 0, 64);
+				}
 
 			}
 
 			if (rx[2] == 2) {
 				printf("[2]\n\r");
-				if (parseFrameV(rx + 4, temp1, hum1,vbat1)) {
+				if (parseFrameV(rx + 4, temp1, hum1, vbat1)) {
 					sprintf(ts1, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
@@ -382,16 +497,34 @@ int main(void) {
 					printf(rx + 4);
 					memset(rx, 0, 64);
 				}
+				//delay_ms(50);
+				sprintf(serverSensorsData, "T:%s H:%s V:%s", temp0, hum0,
+						vbat0);
+				sentResult = RFM69_send(serverSensorsData, 20, 5);
+
+				sprintf(urlParamStr,
+						"json.htm?type=command&param=udevice&idx=4&nvalue=0&svalue=%s;%s;0",
+						temp1, hum1);
+
+				connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168, 0,
+						35, 8080, urlParamStr);
 
 			}
 
 			if (rx[2] == 3) {
 				printf("[3]\n\r");
-				if (parseFrameV(rx + 4, temp2, hum2,vbat2)) {
+				if (parseFrameV(rx + 4, temp2, hum2, vbat2)) {
 
 					sprintf(ts2, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+
+					sprintf(urlParamStr,
+							"json.htm?type=command&param=udevice&idx=3&nvalue=0&svalue=%s;%s;0",
+							temp2, hum2);
+
+					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
+							0, 35, 8080, urlParamStr);
 
 					printf("Pokoj Basi:");
 					printf(rx + 4);
@@ -402,22 +535,27 @@ int main(void) {
 			}
 
 			if (rx[2] == 4) {
-							printf("[4]\n\r");
-							if (parseFrameV(rx + 4, temp3, hum3,vbat3)) {
+				printf("[4]\n\r");
+				if (parseFrameV(rx + 4, temp3, hum3, vbat3)) {
 
-								sprintf(ts3, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
-										RTC_Data.month, RTC_Data.year + 2000,
-										RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
+					sprintf(ts3, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
+							RTC_Data.month, RTC_Data.year + 2000,
+							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
 
-								printf("Sypialnia:");
-								printf(rx + 4);
-								printf(" *\n\r");
-								memset(rx, 0, 64);
-							}
+					sprintf(urlParamStr,
+							"json.htm?type=command&param=udevice&idx=2&nvalue=0&svalue=%s;%s;0",
+							temp3, hum3);
 
-						}
+					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
+							0, 35, 8080, urlParamStr);
 
+					printf("Sypialnia:");
+					printf(rx + 4);
+					printf(" *\n\r");
+					memset(rx, 0, 64);
+				}
 
+			}
 
 		}
 #else
@@ -585,6 +723,31 @@ const char* TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 	return "/temp2.json";
 }
 
+void TM_ETHERNETDNS_FoundCallback(char* host_name, uint8_t ip_addr1,
+		uint8_t ip_addr2, uint8_t ip_addr3, uint8_t ip_addr4) {
+
+
+	timeapiIpAddr[0] = ip_addr1;
+	timeapiIpAddr[1] = ip_addr2;
+	timeapiIpAddr[2] = ip_addr3;
+	timeapiIpAddr[3] = ip_addr4;
+	dnsCallbackCalled = true;
+	timeapiIpAddrFoundFlag = true;
+	printf("####### Found DNS address: %d %d %d %d\r\n",timeapiIpAddr[0],timeapiIpAddr[1],timeapiIpAddr[2],timeapiIpAddr[3]);
+
+	TM_ETHERNETCLIENT_Connect("api.timezonedb.com", timeapiIpAddr[0], timeapiIpAddr[1], timeapiIpAddr[2],timeapiIpAddr[3], 80, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
+
+
+
+	return;
+}
+
+void TM_ETHERNETDNS_ErrorCallback(char* host_name) {
+	dnsCallbackCalled = true;
+	timeapiIpAddrFoundFlag = false;
+	return;
+}
+
 /* SSI server callback, always is called this callback */
 uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 		int iInsertLen) {
@@ -615,12 +778,6 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 		default:
 			return 0;
 		}
-
-
-
-
-
-
 
 		/* Set string according to status */
 		if (status) {
@@ -703,9 +860,14 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 	} else if (iIndex == 19) {
 		/* #rtc_time */
 		TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
-		sprintf(pcInsert, "%04d-%02d-%02d %02d:%02d:%02d", RTC_Data.year + 2000,
-				RTC_Data.month, RTC_Data.date, RTC_Data.hours, RTC_Data.minutes,
-				RTC_Data.seconds);
+		sprintf(pcInsert, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
+				RTC_Data.month, RTC_Data.year + 2000, RTC_Data.hours,
+				RTC_Data.minutes, RTC_Data.seconds);
+		/*
+		 sprintf(pcInsert, "%04d-%02d-%02d %02d:%02d:%02d", RTC_Data.year + 2000,
+		 RTC_Data.month, RTC_Data.date, RTC_Data.hours, RTC_Data.minutes,
+		 RTC_Data.seconds);
+		 */
 	} else if (iIndex == 20) {
 		/* #compiled */
 		strcpy(pcInsert, __DATE__ " at " __TIME__);
@@ -724,48 +886,51 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 	} else if (iIndex == 25) {
 		/* #inTemp */
 		strcpy(pcInsert, inTemp);
-	} else if(iIndex == 26) {
+	} else if (iIndex == 26) {
 		/* #temp1 */
 		strcpy(pcInsert, temp1);
-	} else if(iIndex == 27) {
+	} else if (iIndex == 27) {
 		/* #hum1 */
 		strcpy(pcInsert, hum1);
-	} else if(iIndex == 28) {
+	} else if (iIndex == 28) {
 		/* #vbat11 */
 		strcpy(pcInsert, vbat1);
-	} else if(iIndex == 29) {
+	} else if (iIndex == 29) {
 		/* #ts1 */
 		strcpy(pcInsert, ts1);
-	} else if(iIndex == 30) {
+	} else if (iIndex == 30) {
 		/* #temp2 */
 		strcpy(pcInsert, temp2);
-	} else if(iIndex == 31) {
+	} else if (iIndex == 31) {
 		/* #hum2 */
 		strcpy(pcInsert, hum2);
-	} else if(iIndex == 32) {
+	} else if (iIndex == 32) {
 		/* #vbat2 */
 		strcpy(pcInsert, vbat2);
-	} else if(iIndex == 33) {
+	} else if (iIndex == 33) {
 		/* #ts2 */
 		strcpy(pcInsert, ts2);
-	} else if(iIndex == 34) {
+	} else if (iIndex == 34) {
 		/* #temp3 */
 		strcpy(pcInsert, temp3);
-	} else if(iIndex == 35) {
+	} else if (iIndex == 35) {
 		/* #hum3 */
 		strcpy(pcInsert, hum3);
-	} else if(iIndex == 36) {
+	} else if (iIndex == 36) {
 		/* #vbat3 */
 		strcpy(pcInsert, vbat3);
-	} else if(iIndex == 37) {
+	} else if (iIndex == 37) {
 		/* #ts3 */
 		strcpy(pcInsert, ts3);
-	} else if(iIndex == 42) {
+	} else if (iIndex == 42) {
 		/* #temp0 */
 		strcpy(pcInsert, temp0);
-	} else if(iIndex == 43) {
+	} else if (iIndex == 43) {
 		/* #hum0 */
 		strcpy(pcInsert, hum0);
+	} else if (iIndex == 44) {
+		/* #vbat0 */
+		strcpy(pcInsert, vbat0);
 	} else {
 		/* No valid tag */
 		return 0;
@@ -778,11 +943,14 @@ uint16_t TM_ETHERNETSERVER_SSICallback(int iIndex, char *pcInsert,
 void TM_ETHERNET_IPIsSetCallback(uint8_t ip_addr1, uint8_t ip_addr2,
 		uint8_t ip_addr3, uint8_t ip_addr4, uint8_t dhcp) {
 	/* Called when we have valid IP, it might be static or DHCP */
+	TM_ETHERNET_Result_t connResult;
 
 	if (dhcp) {
 		/* IP set with DHCP */
+		printf("######### DHCP");
 		printf("IP: %d.%d.%d.%d assigned by DHCP server\n", ip_addr1, ip_addr2,
 				ip_addr3, ip_addr4);
+		dhcpAddrSet = true;
 	} else {
 		/* Static IP */
 		printf("IP: %d.%d.%d.%d; STATIC IP used\n", ip_addr1, ip_addr2,
@@ -806,11 +974,19 @@ void TM_ETHERNET_IPIsSetCallback(uint8_t ip_addr1, uint8_t ip_addr2,
 	printf("Link 100M: %d\n", TM_ETHERNET.speed_100m);
 	/* Print duplex status: 1 = Full, 0 = Half */
 	printf("Full duplex: %d\n", TM_ETHERNET.full_duplex);
+
+	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
+	if (connResult == TM_ETHERNET_Result_Error) {
+		printf("DNS Error for api.timezonedb.com\r\n");
+	}
+
+
+
 }
 
 void TM_ETHERNET_DHCPStartCallback(void) {
 	/* Called when has DHCP started with getting IP address */
-	printf("Trying to get IP address via DHCP\n");
+	printf("DHCP has started with assigning IP address\n");
 }
 
 void TM_ETHERNET_LinkIsDownCallback(void) {
@@ -872,6 +1048,80 @@ int TM_ETHERNETSERVER_OpenFileCallback(struct fs_file* file, const char* name) {
 
 	/* Return 1, file opened OK */
 	return 1;
+}
+
+void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
+		uint8_t* buffer, uint16_t buffer_length, uint16_t total_length) {
+	uint16_t buf_len = buffer_length;
+	time_t timeStructure1;
+	struct tm time1;
+	TM_RTC_t timeStruct;
+	TM_RTC_Result_t res;
+
+	rxBuffer = buffer;
+
+	int status1;
+	memset(json_buffer, 0, 2048);
+
+	if (!strcmp(connection->name, "domoticz")
+			&& !getJSONPayload(buffer, json_buffer)) {
+		printf("Domoticz::Received Data:\n\r");
+		printf(json_buffer);
+		return;
+	}
+
+	if (!strcmp(connection->name, "domoticz2")
+			&& !getJSONPayload(buffer, json_buffer)) {
+		printf("Domoticz2::Received Data:\n\r");
+		printf(json_buffer);
+		return;
+	}
+
+	if (!strcmp(connection->name, "api.timezonedb.com")
+			&& !getJSONPayload(buffer, json_buffer)) {
+		printf("Received Data:\n\r");
+		printf(json_buffer);
+
+		status1 = json_read_object(json_buffer, json_attrs, NULL);
+		if (!status1) {
+			printf("Parser JSON succesfully!\r\n");
+			printf("Timestamp: %d\r\n", timestamp);
+
+			timeStructure1 = (time_t) timestamp;
+
+			time1 = *localtime(&timeStructure1);
+
+			//time1ptr = gmtime(timeStructure1);
+
+			timeStruct.seconds = time1.tm_sec;
+			timeStruct.minutes = time1.tm_min;
+			timeStruct.hours = time1.tm_hour;
+
+			timeStruct.date = time1.tm_mday;
+			timeStruct.month = time1.tm_mon + 1;
+			timeStruct.year = time1.tm_year - 100;
+			//timeStruct.year = 1920;
+			timeStruct.day = time1.tm_wday;
+
+			printf("%i -> %s", timeStructure1, asctime(&time1));
+
+			//TM_RTC_SetDateTimeString("17.04.15.6;20:49:30");
+			res = TM_RTC_SetDateTime(&timeStruct, TM_RTC_Format_BIN);
+
+			if (res == TM_RTC_Result_Ok) {
+				printf("Time set succesfully\r\n");
+
+			} else {
+				printf("Error during time set\r\n");
+			}
+
+			//data_ready = 1;
+		} else {
+			printf("JSON Read status error:%d\r\n", status1);
+			printf("JSON Read eror message:%s\r\n", json_error_string(status1));
+		}
+
+	}
 }
 
 int TM_ETHERNETSERVER_ReadFileCallback(struct fs_file* file, char* buffer,
@@ -945,11 +1195,11 @@ int fputc(int ch, FILE *f) {
 	return ch;
 }
 
-uint8_t parseFrame(char *frame,char *temp,char *hum){
-	if(frame[0] == 'T'){
-		strncpy(temp,frame+2,4);
+uint8_t parseFrame(char *frame, char *temp, char *hum) {
+	if (frame[0] == 'T') {
+		strncpy(temp, frame + 2, 4);
 		temp[4] = 0;
-		strncpy(hum,frame+9,4);
+		strncpy(hum, frame + 9, 4);
 		hum[4] = 0;
 
 		return 1;
@@ -958,17 +1208,31 @@ uint8_t parseFrame(char *frame,char *temp,char *hum){
 	}
 }
 
-uint8_t parseFrameV(char *frame,char *temp,char *hum,char *vcc){
-	if(frame[0] == 'T'){
-		strncpy(temp,frame+2,4);
-		temp[4] = 0;
-		strncpy(hum,frame+9,4);
-		hum[4] = 0;
+uint8_t parseFrameV(char *frame, char *temp, char *hum, char *vcc) {
+	char * firstSpacePtr;
+	char * humStartPtr;
+	char * vccStartPtr;
+	if (frame[0] == 'T') {
+		firstSpacePtr = strchr(frame, ' '); //first space pointer after temperature data
 
-		strncpy(vcc,frame+16,4);
+		/** copy temp **/
+		strncpy(temp, frame + 2, firstSpacePtr - (frame + 2));
+		temp[firstSpacePtr - (frame + 2)] = 0;
+
+		/** copy hum **/
+		humStartPtr = firstSpacePtr + 1;
+		firstSpacePtr = strchr(humStartPtr, ' ');
+		strncpy(hum, humStartPtr + 2, firstSpacePtr - (humStartPtr + 2));
+		hum[firstSpacePtr - humStartPtr] = 0;
+
+		/** copy vcc **/
+		vccStartPtr = firstSpacePtr + 1;
+
+		strncpy(vcc, vccStartPtr + 2, 4);
 		vcc[4] = 0;
 
 		return 1;
+
 	} else {
 		return 0;
 	}
