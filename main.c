@@ -493,13 +493,14 @@ int main(void) {
 					sprintf(outTempBuf, "T:%s H:%s V:%s", outTemp, outHum,
 							vbat);
 					sentResult = RFM69_send(outTempBuf, 20, 7);
+					/*
 					sprintf(urlParamStr,
 							"json.htm?type=command&param=udevice&idx=1&nvalue=0&svalue=%s;%s;0",
 							outTemp, outHum);
 					TM_WATCHDOG_Reset();
 					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
 							0, 35, 8080, urlParamStr);
-
+					*/
 					printf("Balkon:");
 
 					printf(rx + 4);
@@ -549,13 +550,14 @@ int main(void) {
 				sprintf(serverSensorsData, "T:%s H:%s V:%s", temp0, hum0,
 						vbat0);
 				sentResult = RFM69_send(serverSensorsData, 20, 5);
-
+				/*
 				sprintf(urlParamStr,
 						"json.htm?type=command&param=udevice&idx=4&nvalue=0&svalue=%s;%s;0",
 						temp1, hum1);
 
 				connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168, 0,
 						35, 8080, urlParamStr);
+						*/
 
 			}
 
@@ -566,14 +568,14 @@ int main(void) {
 					sprintf(ts2, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
-
+					/*
 					sprintf(urlParamStr,
 							"json.htm?type=command&param=udevice&idx=3&nvalue=0&svalue=%s;%s;0",
 							temp2, hum2);
 
 					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
 							0, 35, 8080, urlParamStr);
-
+					*/
 					printf("Pokoj Basi:");
 					printf(rx + 4);
 					printf(" *\n\r");
@@ -589,14 +591,14 @@ int main(void) {
 					sprintf(ts3, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
-
+					/*
 					sprintf(urlParamStr,
 							"json.htm?type=command&param=udevice&idx=2&nvalue=0&svalue=%s;%s;0",
 							temp3, hum3);
 
 					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
 							0, 35, 8080, urlParamStr);
-
+					*/
 					printf("Sypialnia:");
 					printf(rx + 4);
 					printf(" *\n\r");
@@ -1023,18 +1025,19 @@ void TM_ETHERNET_IPIsSetCallback(uint8_t ip_addr1, uint8_t ip_addr2,
 	/* Print duplex status: 1 = Full, 0 = Half */
 	printf("Full duplex: %d\n", TM_ETHERNET.full_duplex);
 
-	/*
+
 	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
 	if (connResult == TM_ETHERNET_Result_Error) {
 		printf("DNS Error for api.timezonedb.com\r\n");
 	}
-	*/
 
+
+	/*
 	connResult = TM_ETHERNETDNS_GetHostByName("api.openweathermap.org");
 		if (connResult == TM_ETHERNET_Result_Error) {
 			printf("DNS Error for api.openweathermap.org\r\n");
 		}
-
+	*/
 
 
 }
