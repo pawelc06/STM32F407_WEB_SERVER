@@ -783,9 +783,11 @@ void TM_ETHERNETDNS_FoundCallback(char* host_name, uint8_t ip_addr1,
 	timeapiIpAddr[3] = ip_addr4;
 	dnsCallbackCalled = true;
 	timeapiIpAddrFoundFlag = true;
-	printf("####### Found DNS address: %d %d %d %d\r\n",timeapiIpAddr[0],timeapiIpAddr[1],timeapiIpAddr[2],timeapiIpAddr[3]);
+	printf("####### Found DNS address: %d\.%d\.%d\.%d for host %s\r\n",timeapiIpAddr[0],timeapiIpAddr[1],timeapiIpAddr[2],timeapiIpAddr[3],host_name);
 
-	TM_ETHERNETCLIENT_Connect("api.timezonedb.com", timeapiIpAddr[0], timeapiIpAddr[1], timeapiIpAddr[2],timeapiIpAddr[3], 80, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
+	if(!strcmp("api.timezonedb.com",host_name)){
+		TM_ETHERNETCLIENT_Connect("api.timezonedb.com", timeapiIpAddr[0], timeapiIpAddr[1], timeapiIpAddr[2],timeapiIpAddr[3], 80, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
+	}
 
 
 
@@ -1267,12 +1269,14 @@ void TM_ETHERNETSERVER_ClientDisconnectedCallback(void) {
 
 void TM_ETHERNETCLIENT_ConnectionClosedCallback(TM_TCPCLIENT_t* connection, uint8_t success) {
     /* We are disconnected, done with connection */
-    if (success) {
+    /*
+	if (success) {
         printf("Connection %s was successfully closed. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
     } else {
         printf("Connection %s was closed because of error. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
     }
-
+	*/
+	return;
 
 }
 
