@@ -781,16 +781,41 @@ const /*@observer@*/ char *json_error_string(int err)
 	return errors[err];
 }
 
-uint8_t getJSONPayload(char *data,char *JSONPayload){
+int8_t getJSONPayload(char *data,char *JSONPayload){
 	char *start;
-	start = strstr(data,"{");
+	uint16_t payloadLen;
+	uint8_t shiftPtr = 4;
 
-	if(start){
-		strcpy(JSONPayload,start);
-		return 0;
-	} else {
-		return 1;
+
+	start = strstr(data,"\r\n\r\n{");
+	if(!start){
+		start = strstr(data,"\r\n94\r\n{");
+		shiftPtr = 6;
 	}
+
+	if(start){ //found start of JSON after HTTP header, copying first part
+		memset(JSONPayload, 0, 2048);
+		start+=shiftPtr; //shifting \r\n chars
+		payloadLen = strlen(start); //length of JSON (to get last part)
+		strcpy(JSONPayload,start);
+		if(start[payloadLen-1] == '}'){
+			return 0; //end of JSON message
+		} else {
+			return 1; //message will continue
+		}
+
+
+	} else { // continue
+		payloadLen = strlen(data); //length of JSON (to get last part)
+		strcat(JSONPayload,data);
+		if(data[payloadLen-1] == '}'){
+			return 0; //end of JSON message
+		} else {
+			return 1; //message will continue
+		}
+
+	}
+	return -1;
 }
 
 /* end */

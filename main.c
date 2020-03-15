@@ -68,6 +68,7 @@ const char * TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 
 uint8_t parseFrame(char *frame, char *temp, char *hum);
 uint8_t parseFrameV(char *frame, char *temp, char *hum, char *vcc);
+uint8_t parseTempFromJSON(char *inData, char *tempStr);
 
 /* CGI call table, only one CGI used */
 TM_ETHERNET_CGI_t CGI_Handlers[] = { { "/ledaction.cgi", LEDS_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
@@ -89,12 +90,14 @@ char temp1[6];
 char temp2[6];
 char temp3[6];
 char temp4[6];
+char temp5[6];
 
 char hum0[5];
 char hum1[5];
 char hum2[5];
 char hum3[5];
 char hum4[5];
+char hum5[5];
 
 char vbat0[5];
 char vbat1[5];
@@ -106,6 +109,7 @@ char ts1[20];
 char ts2[20];
 char ts3[20];
 char ts4[20];
+char ts5[20];
 
 //struct ip_addr ip_targetURL;
 uint8_t targetIp1;
@@ -118,8 +122,9 @@ volatile uint8_t data_ready = 0;
 volatile unsigned int timestamp;
 time_t timeStructure;
 volatile unsigned char buf[16];
-volatile uint32_t salonIntCounter = 0;
+volatile uint32_t RtcIrqIntCounter = 0;
 volatile bool salonPendingMsg = false;
+volatile bool openWeatherMapPendingMsg = false;
 
 uint8_t mac_address[6];
 uint8_t ip_address[] = { 192, 168, 0, 120 };
@@ -139,7 +144,7 @@ static char gmtOffset[10];
 static char dst[10];
 char json_buffer[2048];
 
-static const struct json_attr_t json_attrs[] =
+static const struct json_attr_t json_timeserver_msg_attrs[] =
 		{ { "status", t_string, .addr.string = status, .len = sizeof(status) },
 				{ "message", t_string, .addr.string = message, .len =
 						sizeof(message) },
@@ -152,6 +157,8 @@ static const struct json_attr_t json_attrs[] =
 				{ "dst", t_string, .addr.string = dst, .len = sizeof(dst) }, {
 						"timestamp", t_uinteger, .addr.uinteger = &timestamp },
 				{ NULL }, };
+
+
 
 void updateVbat0(char * vbat0) {
 	float vbat0f;
@@ -175,6 +182,7 @@ void setRTCAlarmForTimeSynchronization() {
 
 	/* Set RTC alarm A, time in binary format */
 	TM_RTC_SetAlarm(TM_RTC_Alarm_A, &AlarmTime, TM_RTC_Format_BIN);
+
 }
 
 /* Custom request handler function */
@@ -189,12 +197,28 @@ void TM_RTC_AlarmAHandler(void) {
 	//TM_RTC_DisableAlarm(TM_RTC_Alarm_A);
 }
 
+
+
 void TM_RTC_RequestHandler(void) {
 
-	salonIntCounter++;
-	if (salonIntCounter % 6 == 0) {
+	RtcIrqIntCounter++;
+	if (RtcIrqIntCounter % 6 == 0) {
 		salonPendingMsg = true;
+
 	}
+
+	if (RtcIrqIntCounter % 9 == 0) {
+		openWeatherMapPendingMsg = true;
+			/* Read RTC clock */
+			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
+
+			/* Print current time to USART */
+			printf("Current date: %02d:%02d:%02d\n", RTC_Data.hours, RTC_Data.minutes,
+			RTC_Data.seconds);
+			printf("RTC_RequestHandler invoked every 90 sec\n\r");
+
+	}
+
 
 }
 
@@ -241,9 +265,11 @@ int main(void) {
 	printf("Start\r\n");
 
 
+
 	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_16s)) {
-	 printf("Reset occured because of Watchdog(init)\n");
+		 printf("Reset occured because of Watchdog(init)\n");
 	 }
+
 
 
 	/* Initialize delay */
@@ -280,7 +306,7 @@ int main(void) {
 	int sentResult;
 	char outTempBuf[21];
 
-	char urlParamStr[75];
+	char urlParamStr[100];
 
 	//RFM69_sleep();
 
@@ -402,6 +428,11 @@ int main(void) {
 	strcpy(temp3, "0.0");
 	strcpy(vbat3, "0.0");
 
+	strcpy(hum4, "0.0");
+	strcpy(temp4, "0.0");
+
+	TM_WATCHDOG_Reset();
+
 	while (1) {
 
 		/* Update ethernet, call this as fast as possible */
@@ -419,13 +450,24 @@ int main(void) {
 			updateVbat0(vbat0);
 			printf("Salon [0] T:%s H:%s\n\r", temp0, hum0);
 
+			/*
 			sprintf(urlParamStr,
 					"json.htm?type=command&param=udevice&idx=5&nvalue=0&svalue=%s;%s;0",
 					temp0, hum0);
 
 			connResult = TM_ETHERNETCLIENT_Connect("domoticz2", 192, 168, 0, 35,
 					8080, urlParamStr);
+			*/
 			salonPendingMsg = false;
+		}
+
+		if(openWeatherMapPendingMsg){
+			TM_WATCHDOG_Reset();
+			sprintf(urlParamStr,"/data/2.5/weather?q=Warsaw,pl&APPID=03af47dbe80f5630cbe86c62cff0d537&lang=pl&units=metric");
+
+			connResult = TM_ETHERNETCLIENT_Connect("api.openweathermap.org", 188,166,16,132,
+					80, urlParamStr);
+			openWeatherMapPendingMsg = false;
 		}
 
 #ifdef USE_IRQ
@@ -449,13 +491,14 @@ int main(void) {
 					sprintf(urlParamStr,
 							"json.htm?type=command&param=udevice&idx=1&nvalue=0&svalue=%s;%s;0",
 							outTemp, outHum);
-
+					TM_WATCHDOG_Reset();
 					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
 							0, 35, 8080, urlParamStr);
 
-					//printf("Balkon:");
+					printf("Balkon:");
 
-					//printf(rx + 4);
+					printf(rx + 4);
+					printf("\n\r");
 
 					res = f_mount(&fs, "0:", 1);
 					res = f_open(&file, "0:www/log.txt",
@@ -1057,11 +1100,12 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 	struct tm time1;
 	TM_RTC_t timeStruct;
 	TM_RTC_Result_t res;
+	uint8_t res1;
 
 	rxBuffer = buffer;
 
 	int status1;
-	memset(json_buffer, 0, 2048);
+
 
 	if (!strcmp(connection->name, "domoticz")
 			&& !getJSONPayload(buffer, json_buffer)) {
@@ -1079,10 +1123,11 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 
 	if (!strcmp(connection->name, "api.timezonedb.com")
 			&& !getJSONPayload(buffer, json_buffer)) {
+
 		printf("Received Data:\n\r");
 		printf(json_buffer);
 
-		status1 = json_read_object(json_buffer, json_attrs, NULL);
+		status1 = json_read_object(json_buffer, json_timeserver_msg_attrs, NULL);
 		if (!status1) {
 			printf("Parser JSON succesfully!\r\n");
 			printf("Timestamp: %d\r\n", timestamp);
@@ -1108,7 +1153,7 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 			//TM_RTC_SetDateTimeString("17.04.15.6;20:49:30");
 			res = TM_RTC_SetDateTime(&timeStruct, TM_RTC_Format_BIN);
 
-			if (res == TM_RTC_Result_Ok) {
+			if (res  == TM_RTC_Result_Ok) {
 				printf("Time set succesfully\r\n");
 
 			} else {
@@ -1119,6 +1164,21 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 		} else {
 			printf("JSON Read status error:%d\r\n", status1);
 			printf("JSON Read eror message:%s\r\n", json_error_string(status1));
+		}
+		return;
+
+
+	}
+
+	if (!strcmp(connection->name, "api.openweathermap.org")
+				&& !getJSONPayload(buffer, json_buffer)) {
+		printf("[api.openweathermap.org] Received Data:\n\r");
+		printf(json_buffer);
+		printf("\n\r");
+
+		res1 = parseTempFromJSON(json_buffer, temp5);
+		if(!res1){
+			printf("[api.openweathermap.org] Temp:%s\n\r",temp5);
 		}
 
 	}
@@ -1236,5 +1296,21 @@ uint8_t parseFrameV(char *frame, char *temp, char *hum, char *vcc) {
 	} else {
 		return 0;
 	}
+}
+
+uint8_t parseTempFromJSON(char *inData, char *tempStr){
+	char *ptrStart;
+	char *ptrEnd;
+	ptrStart = strstr(inData,"\"temp\":");
+	if(ptrStart){
+		ptrStart+=7;
+		ptrEnd = strstr(ptrStart,",");
+		strncpy(tempStr,ptrStart,ptrEnd-ptrStart);
+		tempStr[ptrEnd-ptrStart] = 0;
+		return 0;
+	} else {
+		return 1;
+	}
+
 }
 
