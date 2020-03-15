@@ -799,7 +799,7 @@ int8_t getJSONPayload(char *data,char *JSONPayload){
 		start+=shiftPtr; //shifting \r\n chars
 		payloadLen = strlen(start); //length of JSON (to get last part)
 		strcpy(JSONPayload,start);
-		if(start[payloadLen-1] == '}'){
+		if(start[payloadLen-1] == '}' || (start[payloadLen-6] == '}' && start[payloadLen-1] == '\n')){
 			return 0; //end of JSON message
 		} else {
 			return 1; //message will continue

@@ -536,6 +536,24 @@
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\dhcp.h"/>
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\ipv4\lwip\autoip.h"/>
       </source>
+      <source file="..\..\..\main.c" lastModified="170e04854f0">
+         <include file="..\..\..\cmsis_boot\stm32f4xx.h"/>
+         <include file="..\..\..\defines.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_delay.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_disco.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_usart.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_ethernet.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_rtc.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_watchdog.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_fatfs.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_adc.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_id.h"/>
+         <include file="..\..\..\rfm69.h"/>
+         <include file="..\..\..\utils.h"/>
+         <include file="..\..\..\HTU21D.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_i2c.h"/>
+         <include file="..\..\..\mjson.h"/>
+      </source>
       <source file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\api_msg.h" lastModified="1536fef11e0">
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\opt.h"/>
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\ipv4\lwip\ip_addr.h"/>
@@ -1101,7 +1119,7 @@
       </source>
       <source file="..\..\..\cmsis_boot\system_stm32f4xx.h" lastModified="1536fef0df8">
       </source>
-      <source file="..\..\..\mjson.c" lastModified="170dfd63af7">
+      <source file="..\..\..\mjson.c" lastModified="170e040f8b8">
          <include file="..\..\..\mjson.h"/>
       </source>
       <source file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\core\netif.c" lastModified="1536fef0df8">

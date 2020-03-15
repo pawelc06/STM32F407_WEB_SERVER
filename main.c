@@ -1133,66 +1133,70 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 		return;
 	}
 
-	if (!strcmp(connection->name, "api.timezonedb.com")
-			&& !getJSONPayload(buffer, json_buffer)) {
+	if(!strcmp(connection->name, "api.timezonedb.com")){
+			buffer[buffer_length] = 0;
+			printf("Received api.timezonedb.com data!\n\r");
+			if(!getJSONPayload(buffer, json_buffer)) {
 
-		printf("Received Data:\n\r");
-		printf(json_buffer);
+				printf("Received JSON:\n\r");
+				printf(json_buffer);
 
-		status1 = json_read_object(json_buffer, json_timeserver_msg_attrs, NULL);
-		if (!status1) {
-			printf("Parser JSON succesfully!\r\n");
-			printf("Timestamp: %d\r\n", timestamp);
+				status1 = json_read_object(json_buffer, json_timeserver_msg_attrs, NULL);
+				if (!status1) {
+					printf("Parser JSON succesfully!\r\n");
+					printf("Timestamp: %d\r\n", timestamp);
 
-			timeStructure1 = (time_t) timestamp;
+					timeStructure1 = (time_t) timestamp;
 
-			time1 = *localtime(&timeStructure1);
+					time1 = *localtime(&timeStructure1);
 
-			//time1ptr = gmtime(timeStructure1);
+					//time1ptr = gmtime(timeStructure1);
 
-			timeStruct.seconds = time1.tm_sec;
-			timeStruct.minutes = time1.tm_min;
-			timeStruct.hours = time1.tm_hour;
+					timeStruct.seconds = time1.tm_sec;
+					timeStruct.minutes = time1.tm_min;
+					timeStruct.hours = time1.tm_hour;
 
-			timeStruct.date = time1.tm_mday;
-			timeStruct.month = time1.tm_mon + 1;
-			timeStruct.year = time1.tm_year - 100;
-			//timeStruct.year = 1920;
-			timeStruct.day = time1.tm_wday;
+					timeStruct.date = time1.tm_mday;
+					timeStruct.month = time1.tm_mon + 1;
+					timeStruct.year = time1.tm_year - 100;
+					//timeStruct.year = 1920;
+					timeStruct.day = time1.tm_wday;
 
-			printf("%i -> %s", timeStructure1, asctime(&time1));
+					printf("%i -> %s", timeStructure1, asctime(&time1));
 
-			//TM_RTC_SetDateTimeString("17.04.15.6;20:49:30");
-			res = TM_RTC_SetDateTime(&timeStruct, TM_RTC_Format_BIN);
+					//TM_RTC_SetDateTimeString("17.04.15.6;20:49:30");
+					res = TM_RTC_SetDateTime(&timeStruct, TM_RTC_Format_BIN);
 
-			if (res  == TM_RTC_Result_Ok) {
-				printf("Time set succesfully\r\n");
+					if (res  == TM_RTC_Result_Ok) {
+						printf("Time set succesfully\r\n");
 
-			} else {
-				printf("Error during time set\r\n");
+					} else {
+						printf("Error during time set\r\n");
+					}
+
+					//data_ready = 1;
+				} else {
+					printf("JSON Read status error:%d\r\n", status1);
+					printf("JSON Read eror message:%s\r\n", json_error_string(status1));
+				}
 			}
-
-			//data_ready = 1;
-		} else {
-			printf("JSON Read status error:%d\r\n", status1);
-			printf("JSON Read eror message:%s\r\n", json_error_string(status1));
-		}
 		return;
 
 
 	}
 
-	if (!strcmp(connection->name, "api.openweathermap.org")
-				&& !getJSONPayload(buffer, json_buffer)) {
-		printf("[api.openweathermap.org] Received Data:\n\r");
-		printf(json_buffer);
-		printf("\n\r");
+	if(!strcmp(connection->name, "api.openweathermap.org")){
+		buffer[buffer_length] = 0;
+		if(!getJSONPayload(buffer, json_buffer)) {
+			printf("[api.openweathermap.org] Received Data:\n\r");
+			printf(json_buffer);
+			printf("\n\r");
 
-		res1 = parseTempFromJSON(json_buffer, temp5);
-		if(!res1){
-			printf("[api.openweathermap.org] Temp:%s\n\r",temp5);
+			res1 = parseTempFromJSON(json_buffer, temp5);
+			if(!res1){
+				printf("[api.openweathermap.org] Temp:%s\n\r",temp5);
+			}
 		}
-
 	}
 }
 
