@@ -207,7 +207,7 @@ void TM_RTC_RequestHandler(void) {
 
 	}
 
-	if (RtcIrqIntCounter % 9 == 0) {
+	if (RtcIrqIntCounter % 2 == 0) {
 		openWeatherMapPendingMsg = true;
 			/* Read RTC clock */
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
@@ -465,8 +465,13 @@ int main(void) {
 			TM_WATCHDOG_Reset();
 			sprintf(urlParamStr,"/data/2.5/weather?q=Warsaw,pl&APPID=03af47dbe80f5630cbe86c62cff0d537&lang=pl&units=metric");
 
-			connResult = TM_ETHERNETCLIENT_Connect("api.openweathermap.org", 188,166,16,132,
+			connResult = TM_ETHERNETCLIENT_Connect("api.openweathermap.org", 37,139,20,5,
 					80, urlParamStr);
+			if(connResult == TM_ETHERNET_Result_Ok){
+				printf("TM_ETHERNETCLIENT_Connect::TM_ETHERNET_Result_Ok\r\n");
+			} else {
+				printf("TM_ETHERNETCLIENT_Connect::TM_ETHERNET_Result_Error\r\n");
+			}
 			openWeatherMapPendingMsg = false;
 		}
 
@@ -1018,10 +1023,17 @@ void TM_ETHERNET_IPIsSetCallback(uint8_t ip_addr1, uint8_t ip_addr2,
 	/* Print duplex status: 1 = Full, 0 = Half */
 	printf("Full duplex: %d\n", TM_ETHERNET.full_duplex);
 
+	/*
 	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
 	if (connResult == TM_ETHERNET_Result_Error) {
 		printf("DNS Error for api.timezonedb.com\r\n");
 	}
+	*/
+
+	connResult = TM_ETHERNETDNS_GetHostByName("api.openweathermap.org");
+		if (connResult == TM_ETHERNET_Result_Error) {
+			printf("DNS Error for api.openweathermap.org\r\n");
+		}
 
 
 
@@ -1244,6 +1256,17 @@ uint8_t TM_ETHERNETSERVER_ClientConnectedCallback(struct tcp_pcb *pcb) {
 void TM_ETHERNETSERVER_ClientDisconnectedCallback(void) {
 	/* Print to user */
 	printf("Client disconnected\n");
+}
+
+void TM_ETHERNETCLIENT_ConnectionClosedCallback(TM_TCPCLIENT_t* connection, uint8_t success) {
+    /* We are disconnected, done with connection */
+    if (success) {
+        printf("Connection %s was successfully closed. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
+    } else {
+        printf("Connection %s was closed because of error. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
+    }
+
+
 }
 
 /* For printf function */

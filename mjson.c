@@ -795,6 +795,7 @@ int8_t getJSONPayload(char *data,char *JSONPayload){
 
 	if(start){ //found start of JSON after HTTP header, copying first part
 		memset(JSONPayload, 0, 2048);
+
 		start+=shiftPtr; //shifting \r\n chars
 		payloadLen = strlen(start); //length of JSON (to get last part)
 		strcpy(JSONPayload,start);
