@@ -68,7 +68,7 @@ const char * TEMP_CGI_Handler(int iIndex, int iNumParams, char *pcParam[],
 
 uint8_t parseFrame(char *frame, char *temp, char *hum);
 uint8_t parseFrameV(char *frame, char *temp, char *hum, char *vcc);
-uint8_t parseTempFromJSON(char *inData, char *tempStr);
+uint8_t parseTempAndHumFromJSON(char *inData, char *tempStr,char *humStr);
 
 /* CGI call table, only one CGI used */
 TM_ETHERNET_CGI_t CGI_Handlers[] = { { "/ledaction.cgi", LEDS_CGI_Handler }, /* LEDS_CGI_Handler will be called when user connects to "/ledaction.cgi" URL */
@@ -134,6 +134,7 @@ uint8_t timeapiIpAddr[4];
 volatile bool timeapiIpAddrFoundFlag = false;
 volatile bool dnsCallbackCalled = false;
 volatile bool dhcpAddrSet = false;
+volatile bool internetStarted = false;
 
 static char status[10];
 static char message[10];
@@ -207,7 +208,7 @@ void TM_RTC_RequestHandler(void) {
 
 	}
 
-	if (RtcIrqIntCounter % 2 == 0) {
+	if (RtcIrqIntCounter % 9 == 0) {
 		openWeatherMapPendingMsg = true;
 			/* Read RTC clock */
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
@@ -265,11 +266,11 @@ int main(void) {
 	printf("Start\r\n");
 
 
-
+/*
 	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_16s)) {
 		 printf("Reset occured because of Watchdog(init)\n");
 	 }
-
+*/
 
 
 	/* Initialize delay */
@@ -431,7 +432,31 @@ int main(void) {
 	strcpy(hum4, "0.0");
 	strcpy(temp4, "0.0");
 
+	strcpy(hum5, "0.0");
+	strcpy(temp5, "0.0");
+
 	TM_WATCHDOG_Reset();
+
+	printf("Waiting for internet..\n");
+	while(!internetStarted);
+	printf("Internet started!\n");
+
+	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
+		if (connResult == TM_ETHERNET_Result_Error) {
+			printf("DNS Error for api.timezonedb.com\r\n");
+		}
+
+		printf("Waiting for DNS..\n");
+		while(timeapiIpAddrFoundFlag == false){
+			delay_ms(100);
+			printf(".");
+		}
+		printf("Can proceed with next DNS..\n");
+
+		connResult = TM_ETHERNETDNS_GetHostByName("api.openweathermap.org");
+				if (connResult == TM_ETHERNET_Result_Error) {
+					printf("DNS Error for api.openweathermap.org\r\n");
+				}
 
 	while (1) {
 
@@ -472,6 +497,8 @@ int main(void) {
 			} else {
 				printf("TM_ETHERNETCLIENT_Connect::TM_ETHERNET_Result_Error\r\n");
 			}
+			sprintf(outTempBuf, "T:%s H:%s V:%s", temp5, hum5,vbat);
+			sentResult = RFM69_send(outTempBuf, 20, 7);
 			openWeatherMapPendingMsg = false;
 		}
 
@@ -490,9 +517,10 @@ int main(void) {
 							RTC_Data.date, RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
 
-					sprintf(outTempBuf, "T:%s H:%s V:%s", outTemp, outHum,
-							vbat);
+
+					sprintf(outTempBuf, "T:%s H:%s V:%s", outTemp, outHum, vbat);
 					sentResult = RFM69_send(outTempBuf, 20, 7);
+
 					/*
 					sprintf(urlParamStr,
 							"json.htm?type=command&param=udevice&idx=1&nvalue=0&svalue=%s;%s;0",
@@ -782,11 +810,14 @@ void TM_ETHERNETDNS_FoundCallback(char* host_name, uint8_t ip_addr1,
 	timeapiIpAddr[2] = ip_addr3;
 	timeapiIpAddr[3] = ip_addr4;
 	dnsCallbackCalled = true;
-	timeapiIpAddrFoundFlag = true;
+
 	printf("####### Found DNS address: %d\.%d\.%d\.%d for host %s\r\n",timeapiIpAddr[0],timeapiIpAddr[1],timeapiIpAddr[2],timeapiIpAddr[3],host_name);
 
 	if(!strcmp("api.timezonedb.com",host_name)){
+
 		TM_ETHERNETCLIENT_Connect("api.timezonedb.com", timeapiIpAddr[0], timeapiIpAddr[1], timeapiIpAddr[2],timeapiIpAddr[3], 80, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
+		printf("####### Connect-->%s\r\n",host_name);
+		timeapiIpAddrFoundFlag = true;
 	}
 
 
@@ -796,7 +827,7 @@ void TM_ETHERNETDNS_FoundCallback(char* host_name, uint8_t ip_addr1,
 
 void TM_ETHERNETDNS_ErrorCallback(char* host_name) {
 	dnsCallbackCalled = true;
-	timeapiIpAddrFoundFlag = false;
+	//timeapiIpAddrFoundFlag = false;
 	return;
 }
 
@@ -1027,19 +1058,7 @@ void TM_ETHERNET_IPIsSetCallback(uint8_t ip_addr1, uint8_t ip_addr2,
 	/* Print duplex status: 1 = Full, 0 = Half */
 	printf("Full duplex: %d\n", TM_ETHERNET.full_duplex);
 
-
-	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
-	if (connResult == TM_ETHERNET_Result_Error) {
-		printf("DNS Error for api.timezonedb.com\r\n");
-	}
-
-
-	/*
-	connResult = TM_ETHERNETDNS_GetHostByName("api.openweathermap.org");
-		if (connResult == TM_ETHERNET_Result_Error) {
-			printf("DNS Error for api.openweathermap.org\r\n");
-		}
-	*/
+	internetStarted = true;
 
 
 }
@@ -1197,9 +1216,9 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 			printf(json_buffer);
 			printf("\n\r");
 
-			res1 = parseTempFromJSON(json_buffer, temp5);
+			res1 = parseTempAndHumFromJSON(json_buffer, temp5,hum5);
 			if(!res1){
-				printf("[api.openweathermap.org] Temp:%s\n\r",temp5);
+				printf("[api.openweathermap.org] Temp:%s Hum:%s\n\r",temp5,hum5);
 			}
 		}
 	}
@@ -1269,13 +1288,13 @@ void TM_ETHERNETSERVER_ClientDisconnectedCallback(void) {
 
 void TM_ETHERNETCLIENT_ConnectionClosedCallback(TM_TCPCLIENT_t* connection, uint8_t success) {
     /* We are disconnected, done with connection */
-    /*
+
 	if (success) {
         printf("Connection %s was successfully closed. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
     } else {
         printf("Connection %s was closed because of error. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
     }
-	*/
+
 	return;
 
 }
@@ -1332,15 +1351,31 @@ uint8_t parseFrameV(char *frame, char *temp, char *hum, char *vcc) {
 	}
 }
 
-uint8_t parseTempFromJSON(char *inData, char *tempStr){
+uint8_t parseTempAndHumFromJSON(char *inData, char *tempStr,char *humStr){
 	char *ptrStart;
 	char *ptrEnd;
 	ptrStart = strstr(inData,"\"temp\":");
+	//"humidity":
+
 	if(ptrStart){
 		ptrStart+=7;
 		ptrEnd = strstr(ptrStart,",");
 		strncpy(tempStr,ptrStart,ptrEnd-ptrStart);
+		//tempStr[ptrEnd-ptrStart] = 0;
 		tempStr[ptrEnd-ptrStart] = 0;
+
+		ptrStart = strstr(inData,"\"humidity\":");
+		if(ptrStart){
+				ptrStart+=11;
+				ptrEnd = strstr(ptrStart,"}");
+				strncpy(humStr,ptrStart,ptrEnd-ptrStart);
+				//tempStr[ptrEnd-ptrStart] = 0;
+				humStr[ptrEnd-ptrStart] = 0;
+				strcat(humStr," %");
+		} else {
+			return 1;
+		}
+
 		return 0;
 	} else {
 		return 1;
