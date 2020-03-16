@@ -446,18 +446,13 @@ int main(void) {
 			printf("DNS Error for api.timezonedb.com\r\n");
 		}
 
-		printf("Waiting for DNS..\n");
-		while(timeapiIpAddrFoundFlag == false){
-			delay_ms(100);
-			printf(".");
-		}
-		printf("Can proceed with next DNS..\n");
 
+/*
 		connResult = TM_ETHERNETDNS_GetHostByName("api.openweathermap.org");
 				if (connResult == TM_ETHERNET_Result_Error) {
 					printf("DNS Error for api.openweathermap.org\r\n");
 				}
-
+*/
 	while (1) {
 
 		/* Update ethernet, call this as fast as possible */
@@ -1289,11 +1284,13 @@ void TM_ETHERNETSERVER_ClientDisconnectedCallback(void) {
 void TM_ETHERNETCLIENT_ConnectionClosedCallback(TM_TCPCLIENT_t* connection, uint8_t success) {
     /* We are disconnected, done with connection */
 
+	/*
 	if (success) {
         printf("Connection %s was successfully closed. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
     } else {
         printf("Connection %s was closed because of error. Number of active connections: %d\n", connection->name, *connection->active_connections_count);
     }
+    */
 
 	return;
 
@@ -1371,7 +1368,7 @@ uint8_t parseTempAndHumFromJSON(char *inData, char *tempStr,char *humStr){
 				strncpy(humStr,ptrStart,ptrEnd-ptrStart);
 				//tempStr[ptrEnd-ptrStart] = 0;
 				humStr[ptrEnd-ptrStart] = 0;
-				strcat(humStr," %");
+				strcat(humStr,".0");
 		} else {
 			return 1;
 		}
