@@ -144,6 +144,7 @@ static char abbreviation[10];
 static char gmtOffset[10];
 static char dst[10];
 char json_buffer[2048];
+char outTempBuf[21];
 
 static const struct json_attr_t json_timeserver_msg_attrs[] =
 		{ { "status", t_string, .addr.string = status, .len = sizeof(status) },
@@ -305,7 +306,7 @@ int main(void) {
 	char humds[5];
 	unsigned char payload[24];
 	int sentResult;
-	char outTempBuf[21];
+
 
 	char urlParamStr[100];
 
@@ -492,8 +493,7 @@ int main(void) {
 			} else {
 				printf("TM_ETHERNETCLIENT_Connect::TM_ETHERNET_Result_Error\r\n");
 			}
-			sprintf(outTempBuf, "T:%s H:%s V:%s", temp5, hum5,vbat);
-			sentResult = RFM69_send(outTempBuf, 20, 7);
+
 			openWeatherMapPendingMsg = false;
 		}
 
@@ -1214,6 +1214,8 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 			res1 = parseTempAndHumFromJSON(json_buffer, temp5,hum5);
 			if(!res1){
 				printf("[api.openweathermap.org] Temp:%s Hum:%s\n\r",temp5,hum5);
+				sprintf(outTempBuf, "T:%s H:%s V:%s", temp5, hum5,vbat);
+				RFM69_send(outTempBuf, 20, 7);
 			}
 		}
 	}
