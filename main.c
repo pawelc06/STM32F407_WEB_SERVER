@@ -24,6 +24,8 @@
 #include "tm_stm32f4_i2c.h"
 #include "mjson.h"
 
+#define ENABLE_DOMOTICZ 1
+
 /* File variable */
 FIL fil[ETHERNET_MAX_OPEN_FILES];
 /* Fatfs variable */
@@ -145,6 +147,7 @@ static char gmtOffset[10];
 static char dst[10];
 char json_buffer[2048];
 char outTempBuf[21];
+char urlParamStr[100];
 
 static const struct json_attr_t json_timeserver_msg_attrs[] =
 		{ { "status", t_string, .addr.string = status, .len = sizeof(status) },
@@ -267,11 +270,11 @@ int main(void) {
 	printf("Start\r\n");
 
 
-/*
+
 	 if (TM_WATCHDOG_Init(TM_WATCHDOG_Timeout_16s)) {
 		 printf("Reset occured because of Watchdog(init)\n");
 	 }
-*/
+
 
 
 	/* Initialize delay */
@@ -308,7 +311,7 @@ int main(void) {
 	int sentResult;
 
 
-	char urlParamStr[100];
+
 
 	//RFM69_sleep();
 
@@ -471,14 +474,14 @@ int main(void) {
 			updateVbat0(vbat0);
 			printf("Salon [0] T:%s H:%s\n\r", temp0, hum0);
 
-			/*
+			if(ENABLE_DOMOTICZ){
 			sprintf(urlParamStr,
-					"json.htm?type=command&param=udevice&idx=5&nvalue=0&svalue=%s;%s;0",
-					temp0, hum0);
+					"json.htm?type=command&param=udevice&idx=6&nvalue=0&svalue=%s;%s;0&battery=%d",
+					temp0, hum0,(uint8_t)(atof(vbat0)*100.0f/3.05f));
 
-			connResult = TM_ETHERNETCLIENT_Connect("domoticz2", 192, 168, 0, 35,
+			connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168, 0, 35,
 					8080, urlParamStr);
-			*/
+			}
 			salonPendingMsg = false;
 		}
 
@@ -516,14 +519,14 @@ int main(void) {
 					sprintf(outTempBuf, "T:%s H:%s V:%s", outTemp, outHum, vbat);
 					sentResult = RFM69_send(outTempBuf, 20, 7);
 
-					/*
-					sprintf(urlParamStr,
-							"json.htm?type=command&param=udevice&idx=1&nvalue=0&svalue=%s;%s;0",
-							outTemp, outHum);
-					TM_WATCHDOG_Reset();
-					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
-							0, 35, 8080, urlParamStr);
-					*/
+					if(ENABLE_DOMOTICZ){
+						sprintf(urlParamStr,
+								"json.htm?type=command&param=udevice&idx=2&nvalue=0&svalue=%s;%s;0&battery=%d",
+								outTemp, outHum,(int)(atof(vbat)*100.0f/3.05f));
+						TM_WATCHDOG_Reset();
+						connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
+								0, 35, 8080, urlParamStr);
+					}
 					printf("Balkon:");
 
 					printf(rx + 4);
@@ -573,14 +576,14 @@ int main(void) {
 				sprintf(serverSensorsData, "T:%s H:%s V:%s", temp0, hum0,
 						vbat0);
 				sentResult = RFM69_send(serverSensorsData, 20, 5);
-				/*
-				sprintf(urlParamStr,
-						"json.htm?type=command&param=udevice&idx=4&nvalue=0&svalue=%s;%s;0",
-						temp1, hum1);
+				if(ENABLE_DOMOTICZ){
+					sprintf(urlParamStr,
+						"json.htm?type=command&param=udevice&idx=3&nvalue=0&svalue=%s;%s;0&battery=%d",
+						temp1, hum1,(uint8_t)(atof(vbat1)*100.0f/3.05f));
 
-				connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168, 0,
+					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168, 0,
 						35, 8080, urlParamStr);
-						*/
+				}
 
 			}
 
@@ -591,14 +594,14 @@ int main(void) {
 					sprintf(ts2, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
-					/*
+					if(ENABLE_DOMOTICZ){
 					sprintf(urlParamStr,
-							"json.htm?type=command&param=udevice&idx=3&nvalue=0&svalue=%s;%s;0",
-							temp2, hum2);
+							"json.htm?type=command&param=udevice&idx=4&nvalue=0&svalue=%s;%s;0&battery=%d",
+							temp2, hum2,(uint8_t)(atof(vbat2)*100.0f/3.05f));
 
 					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
 							0, 35, 8080, urlParamStr);
-					*/
+					}
 					printf("Pokoj Basi:");
 					printf(rx + 4);
 					printf(" *\n\r");
@@ -614,14 +617,14 @@ int main(void) {
 					sprintf(ts3, "%02d.%02d.%04d %02d:%02d:%02d", RTC_Data.date,
 							RTC_Data.month, RTC_Data.year + 2000,
 							RTC_Data.hours, RTC_Data.minutes, RTC_Data.seconds);
-					/*
+					if(ENABLE_DOMOTICZ){
 					sprintf(urlParamStr,
-							"json.htm?type=command&param=udevice&idx=2&nvalue=0&svalue=%s;%s;0",
-							temp3, hum3);
+							"json.htm?type=command&param=udevice&idx=5&nvalue=0&svalue=%s;%s;0&battery=%d",
+							temp3, hum3,(uint8_t)(atof(vbat3)*100.0f/3.05f));
 
 					connResult = TM_ETHERNETCLIENT_Connect("domoticz", 192, 168,
 							0, 35, 8080, urlParamStr);
-					*/
+					}
 					printf("Sypialnia:");
 					printf(rx + 4);
 					printf(" *\n\r");
@@ -1216,6 +1219,12 @@ void TM_ETHERNETCLIENT_ReceiveDataCallback(TM_TCPCLIENT_t* connection,
 				printf("[api.openweathermap.org] Temp:%s Hum:%s\n\r",temp5,hum5);
 				sprintf(outTempBuf, "T:%s H:%s V:%s", temp5, hum5,vbat);
 				RFM69_send(outTempBuf, 20, 7);
+
+				if(ENABLE_DOMOTICZ){
+
+					sprintf(urlParamStr,"json.htm?type=command&param=udevice&idx=1&nvalue=0&svalue=%s;%s;0&battery=%d",temp5,hum5,(uint8_t)(atof(vbat)*100.0f/3.05f));
+					TM_ETHERNETCLIENT_Connect("domoticz", 192, 168, 0,35, 8080, urlParamStr);
+				}
 			}
 		}
 	}
