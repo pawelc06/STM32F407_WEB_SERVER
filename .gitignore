@@ -31,3 +31,7 @@
 # Debug files
 *.dSYM/
 *.su
+stm32f4_project/Debug/bin/history.xml
+stm32f4_project/Debug/bin/stm32f4_project.bin
+stm32f4_project/Debug/bin/stm32f4_project.map
+stm32f4_project/Debug/obj/history.xml
