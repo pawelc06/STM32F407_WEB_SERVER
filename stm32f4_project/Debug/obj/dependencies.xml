@@ -191,9 +191,6 @@
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\tcp_echoclient.h"/>
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_ethernet.h"/>
       </source>
-      <source file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_id.h" lastModified="1536fef0df8">
-         <include file="..\..\..\cmsis_boot\stm32f4xx.h"/>
-      </source>
       <source file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_fatfs.h" lastModified="1536fef19b0">
          <include file="..\..\..\cmsis_boot\stm32f4xx.h"/>
          <include file="..\..\..\cmsis_lib\include\stm32f4xx_rcc.h"/>
@@ -535,6 +532,24 @@
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\netif.h"/>
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\dhcp.h"/>
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\ipv4\lwip\autoip.h"/>
+      </source>
+      <source file="..\..\..\main.c" lastModified="17141d00f6e">
+         <include file="..\..\..\cmsis_boot\stm32f4xx.h"/>
+         <include file="..\..\..\defines.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_delay.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_disco.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_usart.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_ethernet.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_rtc.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_watchdog.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_fatfs.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_adc.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_id.h"/>
+         <include file="..\..\..\rfm69.h"/>
+         <include file="..\..\..\utils.h"/>
+         <include file="..\..\..\HTU21D.h"/>
+         <include file="..\..\..\..\00-STM32F429_LIBRARIES\tm_stm32f4_i2c.h"/>
+         <include file="..\..\..\mjson.h"/>
       </source>
       <source file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\api_msg.h" lastModified="1536fef11e0">
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\opt.h"/>
@@ -1085,8 +1100,6 @@
       </source>
       <source file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\port\arch\perf.h" lastModified="1536fef0df8">
       </source>
-      <source file="..\..\..\mjson.h" lastModified="148b9ab4778">
-      </source>
       <source file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\netif\etharp.c" lastModified="1536fef11e0">
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\lwip\opt.h"/>
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\ipv4\lwip\ip_addr.h"/>
@@ -1100,9 +1113,6 @@
          <include file="..\..\..\..\00-STM32F429_LIBRARIES\lwip\src\include\netif\ppp_oe.h"/>
       </source>
       <source file="..\..\..\cmsis_boot\system_stm32f4xx.h" lastModified="1536fef0df8">
-      </source>
-      <source file="..\..\..\mjson.c" lastModified="170e568d0ac">
-         <include file="..\..\..\mjson.h"/>
       </source>
       <source file="..\..\..\cmsis_lib\include\stm32f4xx_tim.h" lastModified="1536fef0df8">
          <include file="..\..\..\cmsis_boot\stm32f4xx.h"/>
