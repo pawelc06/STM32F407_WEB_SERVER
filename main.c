@@ -204,7 +204,7 @@ void TM_RTC_AlarmAHandler(void) {
 
 
 
-void TM_RTC_RequestHandler(void) {
+void TM_RTC_RequestHandler(void) {//called every 10s
 
 	RtcIrqIntCounter++;
 	if (RtcIrqIntCounter % 6 == 0) {
@@ -212,7 +212,7 @@ void TM_RTC_RequestHandler(void) {
 
 	}
 
-	if (RtcIrqIntCounter % 9 == 0) {
+	if (RtcIrqIntCounter % 30 == 0) {
 		openWeatherMapPendingMsg = true;
 			/* Read RTC clock */
 			TM_RTC_GetDateTime(&RTC_Data, TM_RTC_Format_BIN);
@@ -445,18 +445,18 @@ int main(void) {
 	while(!internetStarted);
 	printf("Internet started!\n");
 
-	connResult = TM_ETHERNETDNS_GetHostByName("api.timezonedb.com");
-		if (connResult == TM_ETHERNET_Result_Error) {
-			printf("DNS Error for api.timezonedb.com\r\n");
-		}
+	delay_ms(500);
+
+	timeapiIpAddr[0] = 168;
+	timeapiIpAddr[1] = 235;
+	timeapiIpAddr[2] = 104;
+	timeapiIpAddr[3] = 115;
 
 
-/*
-		connResult = TM_ETHERNETDNS_GetHostByName("api.openweathermap.org");
-				if (connResult == TM_ETHERNET_Result_Error) {
-					printf("DNS Error for api.openweathermap.org\r\n");
-				}
-*/
+			TM_ETHERNETCLIENT_Connect("api.timezonedb.com", timeapiIpAddr[0], timeapiIpAddr[1], timeapiIpAddr[2],timeapiIpAddr[3], 80, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
+			printf("####### Connect-->api.timezonedb.com\r\n");
+
+
 	while (1) {
 
 		/* Update ethernet, call this as fast as possible */
@@ -809,12 +809,12 @@ void TM_ETHERNETDNS_FoundCallback(char* host_name, uint8_t ip_addr1,
 	timeapiIpAddr[3] = ip_addr4;
 	dnsCallbackCalled = true;
 
-	printf("####### Found DNS address: %d\.%d\.%d\.%d for host %s\r\n",timeapiIpAddr[0],timeapiIpAddr[1],timeapiIpAddr[2],timeapiIpAddr[3],host_name);
+
+	//printf("####### Found DNS address: %d\.%d\.%d\.%d for host %s\r\n",timeapiIpAddr[0],timeapiIpAddr[1],timeapiIpAddr[2],timeapiIpAddr[3],host_name);
 
 	if(!strcmp("api.timezonedb.com",host_name)){
 
-		TM_ETHERNETCLIENT_Connect("api.timezonedb.com", timeapiIpAddr[0], timeapiIpAddr[1], timeapiIpAddr[2],timeapiIpAddr[3], 80, "?zone=Europe/Warsaw&format=json&key=G7BLC6X458B0");
-		printf("####### Connect-->%s\r\n",host_name);
+
 		timeapiIpAddrFoundFlag = true;
 	}
 
@@ -1362,6 +1362,7 @@ uint8_t parseFrameV(char *frame, char *temp, char *hum, char *vcc) {
 uint8_t parseTempAndHumFromJSON(char *inData, char *tempStr,char *humStr){
 	char *ptrStart;
 	char *ptrEnd;
+	char *decimalPoint;
 	ptrStart = strstr(inData,"\"temp\":");
 	//"humidity":
 
@@ -1369,8 +1370,10 @@ uint8_t parseTempAndHumFromJSON(char *inData, char *tempStr,char *humStr){
 		ptrStart+=7;
 		ptrEnd = strstr(ptrStart,",");
 		strncpy(tempStr,ptrStart,ptrEnd-ptrStart);
-		//tempStr[ptrEnd-ptrStart] = 0;
 		tempStr[ptrEnd-ptrStart] = 0;
+		if((decimalPoint = strstr(tempStr,"."))){ //if number of decimal places after comma is more than one, set end of string after first decimal digit
+			*(decimalPoint+2) = 0;
+		}
 
 		ptrStart = strstr(inData,"\"humidity\":");
 		if(ptrStart){

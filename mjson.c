@@ -784,14 +784,11 @@ const /*@observer@*/ char *json_error_string(int err)
 int8_t getJSONPayload(char *data,char *JSONPayload){
 	char *start;
 	uint16_t payloadLen;
-	uint8_t shiftPtr = 4;
+	uint8_t shiftPtr = 2;
 
 
-	start = strstr(data,"\r\n\r\n{");
-	if(!start){
-		start = strstr(data,"\r\n94\r\n{");
-		shiftPtr = 6;
-	}
+	start = strstr(data,"\r\n{");
+
 
 	if(start){ //found start of JSON after HTTP header, copying first part
 		memset(JSONPayload, 0, 2048);
